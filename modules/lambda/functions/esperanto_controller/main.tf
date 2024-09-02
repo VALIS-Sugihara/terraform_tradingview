@@ -26,9 +26,10 @@ resource "aws_lambda_function" "this" {
 
 # CloudWatch Event Rule to trigger Lambda on a schedule
 resource "aws_cloudwatch_event_rule" "lambda_schedule" {
-  name                = "lambda_scheduled_rule"
+  name                = "${var.function_path}_lambda_scheduled_rule"
   description         = "Triggers Lambda every day at 12:00 PM UTC"
-  schedule_expression = "cron(0,5,10,15,20,25,30,35,40,45,50,55 * * * ? *)"  # １分間隔
+  # schedule_expression = "cron(0,5,10,15,20,25,30,35,40,45,50,55 * * * ? *)"  # １分間隔
+  schedule_expression = "rate(1 minute)"  # １分間隔
 }
 
 # CloudWatch Event Target to attach the Lambda to the rule
