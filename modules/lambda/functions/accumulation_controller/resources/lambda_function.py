@@ -1,21 +1,33 @@
 import os
 import oandapyV20
-from oandapyV20.endpoints import orders, positions, accounts, pricing
+from oandapyV20.endpoints import (
+    orders,
+    positions,
+    accounts,
+    pricing,
+    transactions,
+)
+from oandapyV20.endpoints.transactions import TransactionIDRange
 from typing import NamedTuple, Dict, List, Tuple
+from datetime import datetime, timedelta, date
+import logging
 
+logger = logging.getLogger(__name__)
+# ロガーのログレベルを設定する
+logger.setLevel(logging.INFO)
 
 # OANDAのAPI設定
 OANDA_ACCOUNT_ID = os.environ["OANDA_ACCOUNT_ID"]
 OANDA_API_KEY = os.environ["OANDA_RESTAPI_TOKEN"]
 OANDA_API_URL = os.environ["OANDA_API_URL"]
 
+MONTHLY_AMOUNT = int(os.environ["MONTHLY_AMOUNT"])  # 月単位の設定積立額
+LEVERAGE = float(os.environ["LEVERAGE"])  # カスタム設定レバレッジ
+
 try:
     ACCOUNT_MODE = os.environ["ACCOUNT_MODE"]
 except Exception:
     raise Exception("ACCOUNT_MODE が設定されていません")
-
-# OANDAのAPIクライアントを設定
-# client = oandapyV20.API(access_token=OANDA_API_KEY)
 
 
 class OANDA:
@@ -28,18 +40,44 @@ class OANDA:
     account_id: str  # OANDA_ACCOUNT_ID
     api_key: str  # OANDA_API_KEY
     api_url: str  # OANDA_API_URL
+    account_mode: str  # ACCOUNT_MODE
     client: oandapyV20.API  # API クライアント
+    leverages: dict  # OANDA の規定レバレッジ
 
-    def __init__(self, account_id, api_key, api_url) -> None:
+    def __init__(
+        self, account_id: str, api_key: str, api_url: str, account_mode: str
+    ) -> None:
         self.account_id = account_id
         self.api_key = api_key
         self.api_url = api_url
+        self.account_mode = account_mode
+        self.client = self._create_client()
+        self.leverages = self._define_leverage()
+        self.trade = self.Trade(self)  # trade_manager
+        self.price = self.Price(self)  # price_manager
+        self.account = self.Account(self)  # account_manager
+
+    def _create_client(self):
+        # Create and return an oandapyV20 API client instance using api_key and api_url
         environment = "practice" if ACCOUNT_MODE == "DEMO" else "live"
-        print(self.account_id, self.api_key, self.api_url)
-        print(f"{environment=}")
-        self.client = oandapyV20.API(
-            access_token=api_key, environment=environment
-        )
+        return oandapyV20.API(access_token=self.api_key, environment=environment)
+
+    def _define_leverage(self):
+        leverages = {}
+        if self.account_mode == "PERS":  # 個人口座の場合のレバレッジ
+            leverages["USD_JPY"] = 0.04
+            leverages["USD_MXN"] = 0.08
+            leverages["TRY_JPY"] = 0.25
+        elif self.account_mode == "CORP":  # 法人口座の場合のレバレッジ
+            leverages["USD_JPY"] = 0.022
+            leverages["USD_MXN"] = 0.05
+            leverages["TRY_JPY"] = 0.25
+        elif self.account_mode == "DEMO":  # デモ口座の場合のレバレッジ
+            leverages["USD_JPY"] = 0.022
+            leverages["USD_MXN"] = 0.05
+            leverages["TRY_JPY"] = 0.25
+
+        return leverages
 
     class Trade:
         """OANDA でのトレードをまとめたクラス
@@ -48,42 +86,47 @@ class OANDA:
             Exception: 全ての例外
         """
 
-        def __init__(self, oanda_instance) -> None:
-            self.oanda = oanda_instance
+        def __init__(self, oanda) -> None:
+            self.oanda = oanda
 
-        # マーケットオーダーを送信する関数
-        def place_order(
+        def place_order(self, order_data: dict):
+            """マーケットオーダーを送信する関数
+
+            Args:
+                order_data (dict): self._make_order_data()
+            Returns:
+                _type_: _description_
+            """
+            r = orders.OrderCreate(self.oanda.account_id, data=order_data)
+            response = self.oanda.client.request(r)
+            return response
+
+        def _make_order_data(
             self,
             units: int,
             instrument: str = "USD_JPY",
             stop_loss_pips=0,
             take_profit_pips=0,
         ):
-            """マーケットオーダーを送信する関数
+            """place_order に request するデータを生成し返す
 
             Args:
-                units (_type_): 購入数
-                instrument (str, optional): 通貨ペア. Defaults to "USD_JPY".
-                stop_loss_pips (int, optional): ストップロスの pips. Defaults to 0.
-                take_profit_pips (int, optional): 利確のpips. Defaults to 0.
+                units (int): 注文数量.
+                instrument (str, optional): 注文通貨ペア. Defaults to "USD_JPY".
+                stop_loss_pips (int, optional): ストップロスの pips 数. Defaults to 0.
+                take_profit_pips (int, optional): 利確の pips 数. Defaults to 0.
 
             Returns:
-                _type_: _description_
+                dict: place_order データに沿った以下の形式
+                {
+                    "order": {
+                        "units": str(units),  # 正の値は買い、負の値は売り
+                        "instrument": instrument,
+                        "timeInForce": "FOK",
+                        "type": "MARKET",
+                        "positionFill": "DEFAULT",
+                }
             """
-            # 現在の価格を取得
-            # endpoint = pricing.PricingInfo(
-            #     accountID=OANDA_ACCOUNT_ID, params={"instruments": instrument}
-            # )
-            # response = client.request(endpoint)
-            # current_price = float(response["prices"][0]["closeoutAsk"])
-
-            # 証拠金の2%をリスクとして計算
-            # margin_available = get_account_margin()
-            # print(f"{margin_available=}")
-            # risk_amount = margin_available * 0.02
-            # stop_loss_price = current_price - (stop_loss_pips * 0.0001)
-            # take_profit_price = current_price + (take_profit_pips * 0.0001)
-
             order_data = {
                 "order": {
                     "units": str(units),  # 正の値は買い、負の値は売り
@@ -91,17 +134,79 @@ class OANDA:
                     "timeInForce": "FOK",
                     "type": "MARKET",
                     "positionFill": "DEFAULT",
-                    # "stopLossOnFill": {
-                    #     "price": f"{stop_loss_price:.5f}"
-                    # },
-                    # "takeProfitOnFill": {
-                    #     "price": f"{take_profit_price:.5f}"
-                    # }
+                    # "stopLossOnFill": {"price": f"{stop_loss_price:.5f}"},
+                    # "takeProfitOnFill": {"price": f"{take_profit_price:.5f}"},
                 }
             }
-            r = orders.OrderCreate(self.oanda.account_id, data=order_data)
-            response = self.oanda.client.request(r)
-            return response
+            return order_data
+
+        def close_all_positions(
+            self,
+            all_positions_data: dict,
+            instrument="USD_JPY",
+        ):
+            """全 Long|Short ポジションの決済を送信する関数
+
+            Args:
+                all_position_data (dict): self._make_all_position_data()
+                instrument (str): 決済する通貨ペア. Defaults to "USD_JPY".
+
+            Raises:
+                Exception: Error: {instrument}:{close_action} position is NOT closing
+
+            Returns:
+                _type_: _description_
+            """
+            try:
+                request = positions.PositionClose(
+                    accountID=self.oanda.account_id,
+                    instrument=instrument,
+                    data=all_positions_data,
+                )
+                response = self.oanda.client.request(request)
+
+                # print(
+                #     "position close: {} at {}. pl: {}".format(
+                #         response.get(f"{close_action}OrderFillTransaction").get(
+                #             "units"
+                #         ),
+                #         response.get(f"{close_action}OrderFillTransaction").get(
+                #             "price"
+                #         ),
+                #         response.get(f"{close_action}OrderFillTransaction").get("pl"),
+                #     )
+                # )
+
+                return response
+
+            except Exception as e:
+                logger.error(str(e))
+                raise Exception(
+                    f"Error: {instrument}:{all_positions_data.keys[0]} position is NOT closing"
+                )
+
+        def _make_all_positions_data(self, close_action: str):
+            """positions.PositionClose に request するデータを生成し返す
+
+            Args:
+                close_action (str): 決済するポジション. long | short
+
+            Raises:
+                Exception: Error: close action {close_action} is wrong
+
+            Returns:
+                dict: close_all_positions データに沿った以下の形式
+                {"longUnits | shortUnits": "ALL"}
+            """
+            if close_action not in ["long", "short"]:
+                raise Exception(f"Error: close action '{close_action}' is wrong")
+            # Long ポジション or Short ポジションの決済指定
+            all_positions_data = (
+                {"longUnits": "ALL"}
+                if close_action == "long"
+                else {"shortUnits": "ALL"}
+            )
+            return all_positions_data
 
         # ポジション決済を送信する関数
         def position_close(
@@ -140,12 +245,8 @@ class OANDA:
 
                     print(
                         "position close: {} at {}. pl: {}".format(
-                            response.get("longOrderFillTransaction").get(
-                                "units"
-                            ),
-                            response.get("longOrderFillTransaction").get(
-                                "price"
-                            ),
+                            response.get("longOrderFillTransaction").get("units"),
+                            response.get("longOrderFillTransaction").get("price"),
                             response.get("longOrderFillTransaction").get("pl"),
                         )
                     )
@@ -164,15 +265,9 @@ class OANDA:
 
                     print(
                         "position close: {} at {}. pl: {}".format(
-                            response.get("shortOrderFillTransaction").get(
-                                "units"
-                            ),
-                            response.get("shortOrderFillTransaction").get(
-                                "price"
-                            ),
-                            response.get("shortOrderFillTransaction").get(
-                                "pl"
-                            ),
+                            response.get("shortOrderFillTransaction").get("units"),
+                            response.get("shortOrderFillTransaction").get("price"),
+                            response.get("shortOrderFillTransaction").get("pl"),
                         )
                     )
 
@@ -182,7 +277,7 @@ class OANDA:
                     raise Exception("ポジションを決済できませんでした")
 
             except Exception as e:
-                print("Error:", str(e))
+                logger.error(str(e))
                 return {"statusCode": 500, "body": "Error Position Closing"}
 
     class Price:
@@ -194,28 +289,25 @@ class OANDA:
             mid: float  # 中値
 
         PriceMap = Dict[str, Prices]
-        # PriceMap = Dict[str, float]
         price_map: PriceMap
-        main_currency_pairs = (
-            "USD_JPY",
-            "USD_MXN",
-        )
+        main_currency_pairs = ("USD_JPY", "USD_MXN", "TRY_JPY")
         main_currencies = (
             "USD",
             "JPY",
             "MXN",
         )
 
-        def __init__(self, oanda_instance):
-            self.price_map = {}
-            self.oanda = oanda_instance
+        def __init__(self, oanda):
+            self.oanda = oanda
+            self._generate_price_map()
 
-        def generate_price_map(self):
-            print(f"{self.main_currency_pairs} の price_map を生成します")
+        def _generate_price_map(self):
+            self.price_map = {}
+            logger.info("price_map を生成します")
             for currency_pair in self.main_currency_pairs:
-                bid, ask, mid = self.get_price(instruments=currency_pair)
-                self.price_map[currency_pair] = self.Prices(bid, ask, mid)
-            print(f"{self.price_map=}")
+                prices = self.get_price(instruments=currency_pair)
+                self.price_map[currency_pair] = prices
+            logger.info(f"{self.price_map=}")
 
         def get_price(self, instruments: str):
             """価格取得関数
@@ -237,10 +329,11 @@ class OANDA:
                 prices = response["prices"][0]
                 bid = float(prices["bids"][0]["price"])
                 ask = float(prices["asks"][0]["price"])
-                middle_price = (float(bid) + float(ask)) / 2
-                return bid, ask, middle_price
+                mid = (float(bid) + float(ask)) / 2  # 中値
+                return self.Prices(bid, ask, mid)
             except Exception as e:
-                print(f"Error: {e}")
+                logger.error(f"Error: {e}")
+                raise Exception("価格を取得できませんでした")
 
         def get_price_from_pricemap(self, instruments, bid_ask_mid="mid"):
             target_price = self.price_map.get(instruments, False)
@@ -265,24 +358,309 @@ class OANDA:
     class Account:
         """OANDA での口座情報をまとめたクラス"""
 
-        def __init__(self, oanda_instance) -> None:
-            self.oanda = oanda_instance
+        account_summary: dict  # 口座情報を取得しておく
 
-        # 証拠金を取得する関数
-        def get_account_margin(self):
-            """証拠金を取得する関数
+        def __init__(self, oanda) -> None:
+            self.oanda = oanda
+            self.account_summary = self._get_account_summary()
+
+        def _get_account_summary(self):
+            """口座情報を取得する関数
+
+            Returns:
+                account_summary (dict): 口座情報
+                {
+                    'guaranteedStopLossOrderMode': 'DISABLED',
+                    'hedgingEnabled': True,
+                    'id': '101-009-30020937-001',
+                    'createdTime': '2024-10-01T00:57:23.803531367Z',
+                    'currency': 'JPY',
+                    'createdByUserID': 30020937,
+                    'alias': 'fxTradeDEMO',
+                    'marginRate': '0.02',
+                    'lastTransactionID': '5',
+                    'balance': '3000000.0000',
+                    'openTradeCount': 1,
+                    'openPositionCount': 1,
+                    'pendingOrderCount': 0,
+                    'pl': '0.0000',
+                    'resettablePL': '0.0000',
+                    'resettablePLTime': '0',
+                    'financing': '0.0000',
+                    'commission': '0.0000',
+                    'dividendAdjustment': '0',
+                    'guaranteedExecutionFees': '0.0000',
+                    'unrealizedPL': '6400.0000',
+                    'NAV': '3006400.0000',
+                    'marginUsed': '577296.0000',
+                    'marginAvailable': '2429304.0000',
+                    'positionValue': '14432400.0000',
+                    'marginCloseoutUnrealizedPL': '6600.0000',
+                    'marginCloseoutNAV': '3006600.0000',
+                    'marginCloseoutMarginUsed': '577296.0000',
+                    'marginCloseoutPositionValue': '14432400.0000',
+                    'marginCloseoutPercent': '0.19201',
+                    'withdrawalLimit': '2429304.0000'
+                }
+            """
+            endpoint = accounts.AccountSummary(self.oanda.account_id)
+            response = self.oanda.client.request(endpoint)
+            """ response
+            {
+                'account': {
+                    'guaranteedStopLossOrderMode': 'DISABLED',
+                    'hedgingEnabled': True,
+                    'id': '101-009-30020937-001',
+                    'createdTime': '2024-10-01T00:57:23.803531367Z',
+                    'currency': 'JPY',
+                    'createdByUserID': 30020937,
+                    'alias': 'fxTradeDEMO',
+                    'marginRate': '0.02',
+                    'lastTransactionID': '3',
+                    'balance': '3000000.0000',
+                    'openTradeCount': 0,
+                    'openPositionCount': 0,
+                    'pendingOrderCount': 0,
+                    'pl': '0.0000',
+                    'resettablePL': '0.0000',
+                    'resettablePLTime': '0',
+                    'financing': '0.0000',
+                    'commission': '0.0000',
+                    'dividendAdjustment': '0',
+                    'guaranteedExecutionFees': '0.0000',
+                    'unrealizedPL': '0.0000',
+                    'NAV': '3000000.0000',
+                    'marginUsed': '0.0000',
+                    'marginAvailable': '3000000.0000',
+                    'positionValue': '0.0000',
+                    'marginCloseoutUnrealizedPL': '0.0000',
+                    'marginCloseoutNAV': '3000000.0000',
+                    'marginCloseoutMarginUsed': '0.0000',
+                    'marginCloseoutPositionValue': '0.0000',
+                    'marginCloseoutPercent': '0.00000',
+                    'withdrawalLimit': '3000000.0000'
+                },
+                'lastTransactionID': '3'
+            }
+            """
+            return response["account"]
+
+        def get_margin_available(self):
+            """利用可能証拠金を取得する関数
 
             Returns:
                 margin_available (float): 証拠金残高
             """
-            endpoint = accounts.AccountSummary(self.oanda.account_id)
-            print(self.oanda.account_id, endpoint)
-            response = self.oanda.client.request(endpoint)
-            margin_available = float(response["account"]["marginAvailable"])
+            margin_available = float(self.account_summary["marginAvailable"])
             return margin_available
 
+        def get_margin_used(self):
+            """維持証拠金を取得する関数
 
-class Accumulation:
+            Returns:
+                margin_used (float): marginUsed
+            """
+            margin_used = float(self.account_summary["marginUsed"])
+            return margin_used
+
+        def get_net_asset_value(self):
+            """有効残高を取得する関数
+
+            Returns:
+                nav (float): 有効残高（含み益や含み損を含む）
+            """
+            nav = float(self.account_summary["NAV"])
+            return nav
+
+        def get_swap_points(self):
+            # オープンポジションの情報を取得
+            r = positions.OpenPositions(accountID=self.oanda.account_id)
+            response = self.oanda.client.request(r)
+            print(f"{response=}")
+
+            # レスポンスからスワップポイントを抽出
+            open_positions = r.response.get("positions", [])
+            for position in open_positions:
+                instrument = position["instrument"]
+                long_swap = position["long"]["financing"]
+                short_swap = position["short"]["financing"]
+                print(
+                    f"Instrument: {instrument}, Long Swap: {long_swap}, Short Swap: {short_swap}"
+                )
+                """
+                Instrument: USD_MXN, Long Swap: 0.0000, Short Swap: 409.4515
+                Instrument: USD_JPY, Long Swap: 434.2470, Short Swap: 0.0000
+                """
+
+        def get_transactions_last_month(self):
+            # 先月の開始日と終了日を計算
+            now = datetime.now()
+            last_month_end = now.replace(day=1) - timedelta(days=1)
+            last_month_start = last_month_end.replace(day=1)
+
+            # 先月の取引を取得
+            # params = {
+            #     "from": last_month_start.isoformat() + "Z",
+            #     "to": last_month_end.isoformat() + "Z",
+            # }
+            # 先月の開始日と終了日を 'YYYY-MM-DD' 形式に変換
+            last_month_start_str = last_month_start.strftime("%Y-%m-%d")
+            last_month_end_str = last_month_end.strftime("%Y-%m-%d")
+
+            # 取引履歴を取得
+            params = {
+                "type": "ORDER_FILL",
+                "from": last_month_start_str,
+                "to": last_month_end_str,
+            }
+
+            r = transactions.TransactionList(
+                accountID=self.oanda.account_id, params=params
+            )
+            response = self.oanda.client.request(r)
+            print(params)
+            print(f"{response=}")
+            exit()
+            # transactions = TransactionIDRange(accountID=self.oanda.account_id, params=params)
+            # response = self.oanda.client.request(transactions)
+
+            # ポジションに関連する取引を抽出
+            for transaction in response["transactions"]:
+                if transaction["type"] in [
+                    "ORDER_FILL",
+                    "TRADE_OPEN",
+                    "TRADE_CLOSE",
+                ]:
+                    print(transaction)
+
+
+class Investment:
+    """投資の際の共通ロジックを集約するクラス。
+
+    Raises:
+        Exception: 全ての例外
+    """
+
+    platform: any  # OANDA などの Platform クラス
+    leverage: float  # 独自で設定したレバレッジ
+
+    def __init__(self, platform: any, leverage: float):
+        self.platform = platform
+        self.leverage = leverage
+
+    def calcurate_usdjpy_amount(self, jpy_amount: int, price_map: dict):
+        """USD_JPY の購入枚数を計算する関数
+
+        Args:
+            jpy_amount (int): 円単位での通貨量
+            price_map (dict): プライスマップ OANDA.Price.PriceMap
+        """
+        value = jpy_amount * self.leverage
+        usd_amount = round(value / price_map["USD_JPY"].ask)
+
+        return usd_amount
+
+    def calcurate_tryjpy_amount(self, jpy_amount: int):
+        """TRY_JPY の購入枚数を計算する関数
+
+        Args:
+            jpy_amount (int): 円単位での通貨量
+        """
+        # TRY_JPY についてはレバレッジで割った枚数とする
+        try_amount = round(jpy_amount / self.leverage)
+
+        return try_amount
+
+    def calculate_required_margin(self, instrument: str, amount: int, price_map: dict):
+        """必要証拠金を計算する関数
+
+        Args:
+            amount (int): 外貨での通貨量
+            instrument (str): 通貨ペア USD_JPY etc...
+            price_map (dict): プライスマップ OANDA.Price.PriceMap
+        """
+        # ベースとなる通貨を抜き出す ex) USD_MXN の場合 USD レートを参照するため
+        base_instrument = instrument.split("_")[0]
+        # レートより円換算する
+        jpy_amount = price_map[f"{base_instrument}_JPY"].ask * amount
+        # 規定レバレッジより必要証拠金を計算
+        required_margin = jpy_amount * self.platform.leverages[instrument]
+
+        return required_margin
+
+    def verify_purchase_requirements(
+        self, currency_pair_amounts: dict, price_map: dict
+    ):
+        """購入条件を満たしているかを確認する
+
+        Args:
+            currency_pairs (list): 通貨ペアと数量のリスト ex){"USD_JPY": 1000, "USD_MXN": 1000, "TRY_JPY": 3000}
+            price_map (dict): プライスマップ OANDA.Price.PriceMap
+        """
+        flag = True
+        # アカウントの有効証拠金残高の確認
+        margin_available = self.platform.account.get_margin_available()
+        # それぞれの必要証拠金の合計額を計算する
+        required_margin = 0
+        for instrument, amount in currency_pair_amounts.items():
+            required_margin += self.calculate_required_margin(
+                instrument=instrument, amount=amount, price_map=price_map
+            )
+        # 必要証拠金が購入金額以下の場合は False
+        if margin_available < required_margin:
+            flag = False
+            return flag
+
+        # 有効残高 / 維持証拠金 が 110% 以下の場合は False
+        margin_used = self.platform.account.get_margin_used()
+        nav = self.platform.account.get_net_asset_value()
+        if (nav / margin_used) * 100 < 110:
+            flag = False
+            return flag
+
+        return flag
+
+    @classmethod
+    def count_weekdays_in_month(cls, target_date: date = None):
+        # 日付が指定されていない場合現在の日付を取得
+        today = date.today() if target_date is None else target_date
+
+        # 当月の初日と最終日を取得
+        first_day_of_month = today.replace(day=1)
+        last_day_of_month = first_day_of_month.replace(
+            month=today.month + 1, day=1
+        ) - timedelta(days=1)
+
+        # 平日をカウントする変数
+        weekday_count = 0
+
+        # 当月の各日をループして平日をカウント
+        for day in range(first_day_of_month.day, last_day_of_month.day + 1):
+            current_day = today.replace(day=day)
+            if current_day.weekday() < 5:  # 0=月曜日, 1=火曜日, ..., 4=金曜日
+                weekday_count += 1
+
+        return weekday_count
+
+    @classmethod
+    def convert_jpy_to_usd(cls, price_map: dict):
+        """JPY の通貨量を USD 単位へ変換する関数
+
+        Args:
+            price_map (dict): プライスマップ
+
+        Raises:
+            Exception: 全ての例外
+
+        Returns:
+            usd_amount (int): USD の通貨量
+        """
+        usd_rate = price_map["USD_JPY"].mid / price_map["USD_MXN"].mid
+        usd_amount = int(cls.daily_amount / usd_rate)
+        return usd_amount
+
+
+class Accumulation(Investment):
     """積立のための管理クラス
     1000万ペソ = 69万円/月 スワップ
     MXN/JPN が NY サーバに存在しないため
@@ -304,17 +682,85 @@ class Accumulation:
         基本はスワップを再度回して複利運用することで下記テーブルのようになる。
         1年目 - 3,264,188, 2年目 - 5,327,463, 3年目 - 8,694,920, 4年目 - 14,190,928, 5年目 - 23,160,931,
         円単位で年間 100万円の利率を目指し運用する
+        概算によると usd/jpy+usd/mxn で年利 9%強
+        TRY/JPY ポジションを含めることで年利 11%ほどのポートフォリオとする
+    [ 戦術 ]
+        積立分は枚数を固定する。円安となり上がってきた場合に買い支えできるため
+            毎月 40360枚~30270枚 等の固定枚数を積み立てる
+        複利分はレバレッジを固定する。複利単体で見て適正なバランスで維持するため
+            80万円スワップがあった際には、レバレッジ x6 として 480万円分の通貨購入を行う
+        => おそらく全てレバレッジベースで操作した方が良いのではないか？↓ロスカットコントローラにより全体倍率を 7.7倍等に定め逼迫したら削る処理を行う？
+        USD/JPY: 7.7倍, USD/MXN: 7.7倍, TRY/JPY: 1/7.7倍 量の通貨購入を行う
+    [ ロスカット戦略・戦術 ]
+        USD/JPY と USD/MXN は分けて扱う
+        その月毎に集計し、本来ロスカットであるラインで stoploss をまとめて設定する
+        プレロスカットコントローラーを作成する
+        そのポジションのレバレッジがたとえば 5倍を割るライン
+            150 usd/jpy の long 1000unit を保有しているとすると証拠金は 3300yen
+            有効証拠金が 10000yen の場合は、1pips 10円の値動きのため差異 6700yen-670pips-6.7yen でロスカット
+            本来の 7倍を保つためのラインを求め、ポジション数を削ることで倍率を調整する
+        毎月の積立は燃料と同じ。進めるだけ進むがレバレッジが 20倍を超えるとブレーキを踏む。
+        その時は含み益があるポジションから整理し、17~15倍程度まで戻す
+        本来のロスカット値にてストップロスが入った場合は、翌月の積立コントローラにて含めて買い付ける
     """
 
-    dairy_amount: int  # 毎日購入する通貨量（円単位）
-    dairy_mxn_amount: int  # 毎日購入する通貨量（ペソ単位）
-    dairy_usd_amount: int  # 毎日購入する通貨量（ドル単位）
+    platform: any  # OANDA などの Platform クラス
+    leverage: float  # 独自で設定したレバレッジ
 
-    def __init__(self, dairy_amount: int, price_map: dict) -> None:
-        self.dairy_amount = dairy_amount
-        self.dairy_mxn_amount = self.convert_jpy_to_mxn(price_map)
-        self.dairy_usd_amount = self.convert_mxn_to_usd(price_map)
-        self.__change_account_mode()
+    def __init__(self, platform: any, leverage: float) -> None:
+        super().__init__(platform=platform, leverage=leverage)
+
+    def execute_purchase(self, daily_amount: int):
+        # プライスマップの取得
+        price_map = self.platform.price.price_map
+        # USD_JPY の購入枚数の計算
+        usd_amount = self.calcurate_usdjpy_amount(daily_amount, price_map)
+        # USD_MXN の購入枚数の計算（USD 単位なので同量を購入
+        mxn_amount = usd_amount
+        # TRY_JPY の購入枚数の計算
+        try_amount = self.calcurate_tryjpy_amount(daily_amount)
+        # 与信確認
+        currency_pair_amounts = {
+            "USD_JPY": usd_amount,
+            "USD_MXN": mxn_amount,
+            "TRY_JPY": try_amount,
+        }
+        if self.verify_purchase_requirements(currency_pair_amounts, price_map):
+            # USD_JPY の Long
+            # TODO: stoploss の設定
+            usd_order_data = self.platform.trade._make_order_data(
+                units=usd_amount, instrument="USD_JPY"
+            )
+            self.platform.trade.place_order(usd_order_data)
+            # USD_MXN の Short
+            # TODO: stoploss の設定
+            mxn_amount = -1 * mxn_amount  # Short のため - 数量にする
+            mxn_order_data = self.platform.trade._make_order_data(
+                units=mxn_amount, instrument="USD_MXN"
+            )
+            self.platform.trade.place_order(mxn_order_data)
+            # TRY_JPY の Long
+            # TODO: stoploss の設定
+            try_order_data = self.platform.trade._make_order_data(
+                units=try_amount, instrument="TRY_JPY"
+            )
+            self.platform.trade.place_order(try_order_data)
+
+    @classmethod
+    def get_daily_amount(cls, monthly_amount: int, target_date: date = None):
+        """日単位の購入 円 通貨量を求める関数
+        四捨五入されて int で返る
+
+        Args:
+            monthly_amount (int): 月額の積立予算額（円）
+            target_date (date, optional): 指定日時
+
+        Returns:
+            int: 四捨五入された 円 通貨量
+        """
+        weekday_count = super().count_weekdays_in_month(target_date)
+        daily_amount = round(monthly_amount / weekday_count)
+        return daily_amount
 
     def __change_account_mode(self):
         """アカウントモードによる調整を行う
@@ -324,47 +770,13 @@ class Accumulation:
             pass
         elif ACCOUNT_MODE == "PERS":
             # 個人環境の場合 1/10 で検証する
-            self.dairy_amount = int(self.dairy_amount / 10)
+            self.daily_amount = int(self.daily_amount / 10)
             self.dairy_mxn_amount = int(self.dairy_mxn_amount / 10)
             self.dairy_usd_amount = int(self.dairy_usd_amount / 10)
         elif ACCOUNT_MODE == "CORP":
             pass
         else:
             raise Exception("***不正な ACCOUNT_MODE です***")
-
-    def convert_jpy_to_mxn(self, price_map: dict):
-        """JPY の通貨量を MXN 単位へ変換する関数
-        サーバに MXN/JPY がないため USD/JPY / USD/MXN の中値で MXN/JPY レートを計算する
-
-        Args:
-            price_map (dict): プライスマップ
-
-        Raises:
-            Exception: 全ての例外
-
-        Returns:
-            mxn_amount (int): MXN の通貨量
-        """
-        mxn_rate = price_map["USD_JPY"].mid / price_map["USD_MXN"].mid
-        print(f"{mxn_rate=}")
-        mxn_amount = int(self.dairy_amount / mxn_rate)
-        print(f"{mxn_amount=}")
-        return mxn_amount
-
-    def convert_mxn_to_usd(self, price_map: dict):
-        """MXN の通貨量を USD 単位へ変換する関数
-
-        Args:
-            rate (float): USD/MXN の計算レート
-
-        Raises:
-            Exception: 全ての例外
-
-        Returns:
-            usd_amount (int): USD の通貨量
-        """
-        usd_amount = int(self.dairy_mxn_amount / price_map["USD_MXN"].bid)
-        return usd_amount
 
     # def calc_stop_loss_pips(self, margin_available: float, instrument: str):
     #     """ストップロスを設定するための関数
@@ -386,156 +798,39 @@ class Accumulation:
     #         pips =
 
 
-class FundManagement:
-    """資金管理用クラス
-    利益の 50%: 消費, 40%: 投資, 10%: 消費
-    GOLDEN RULES:
-        ・トレンドの判断は直近高値、安値を更新したか
-        ・資金管理は２％
-        ・複利が適用できる運用方針とする
-        ・通貨の強弱  GBP/USD↑ GBP/JPY↑ USD/JPY↑ の時 GBP>USD>JPY となり GBP/JPY で強いトレンドとなりやすい
-        ・利益の毎月 20% は出金する（税金）
-    Attributes:
-        name (str): The name of the person.
-        age (int): The age of the person.
-    """
-
-    def rule_of_2percent():
-        """2%ルールを適用する
-        クロス円: ロット（通貨量） = 損失額 / 損失幅(pips) * 100
-        ドルストレート: ロット（通貨量） = 損失額 / 損失幅(pips) / ドル円レート * 10000
-            ☆バルサラ破産確率表も利用する
-
-        """
-        pass
-
-    def kelly_criterion():
-        """ケリー基準を求める関数
-        単利でプラスの期待値があるシステムが複利効果を得ると最終的なリターンは大きくなりますが、
-        リスクを過剰に取るとドローダウンを回復できなくなるため逆に最終的なリターンは小さくなっていくことを、ここまでで解説しました。
-            https://www.oanda.jp/lab-education/ea_trading/beginner/optimal_f_fund_management/
-        ケリー基準(Kelly criterion)は、最終的なリターンを最大化するための複利運用比率を求めます。
-        f = p - (1-p)/b
-            f: 掛け金の比率
-            p: 勝率。勝率 55% なら p=0.55 となる。
-            b: 利益と損失の比率。利益 150、損失 100なら b=1.5 となる
-        """
-
-
-class TradingEnvironmentAnalysis:
-    """環境認識クラス
-    取引手法や分析に関するメソッドを扱う
-        ・トレンド判断
-        ・通過強弱判断
-    シグナル毎に Severity をつける
-        Severity: HIGH
-            月足のゴールデンクロス
-            週足のゴールデンクロス
-        Severity: MEDIUM
-            日足のゴールデンクロス
-            下位足の複数同時のゴールデンクロス？
-            複数のダイバージェンス？
-    """
-
-    def elliot_diagonal():
-        """エリオット波動を分析する関数
-        エリオット波動定義：
-            高さ：
-                2 < 1 < 3 < 4 < 5
-                2波は1波の始まりより低くならない（ヒゲさえも）
-                4波は1波の終点=2波の始点よりも低くならない
-                2波は深く戻すことが多く、4波は浅く戻す
-                2波は簡単なチャートパターン、4波は複雑になることが多い=オルタネーション（2と4が逆のパターンもある）
-                5波の高さは3波を超える=>3波超えたら利確の準備
-                イレギュラーパターン:
-                    フェイラー: 5波が3波を超えない => 勢いが不足している場合に表れる
-                    エンディングダイアゴナル: 5波において 12345 がフラッグのような形で重なり表れる
-                    エクステンション: 3波で12345波の形となっている => 強力なトレンドで現れやすい
-                    ランニングコレクション: 2波が落ちず3波に繋がる => 相場に大きな勢いがある時に表れる
-
-            長さ：
-                2-3
-                3波より1波の方が長い場合、1波 < 3波 < 5波
-
-        """
-
-
-# 購入 units 数を計算する関数
-def calculate_units(
-    entry_price, margin, risk_percentage=0.02, stop_loss_pips=50
-):
-    """
-    entry_price: エントリー価格 (例えば、USD/JPY の 価格)
-    margin: 証拠金の額
-    risk_percentage: リスクとして設定する証拠金の割合 (デフォルトは 2%)
-    stop_loss_pips: 設定するストップロスまでの pips (デフォルトは 50 pips)
-
-    # 例: USD/JPY = 150.00 でエントリー、証拠金が 500,000 円、ストップロスを 50 pips に設定する場合
-    entry_price = 150.00
-    margin = 500000  # 証拠金
-    stop_loss_pips = 50  # ストップロスまでの pips
-
-    units = calculate_units(entry_price, margin, stop_loss_pips=stop_loss_pips)
-    print(f"購入するユニット数: {int(units)}")
-    """
-    risk_amount = margin * risk_percentage  # 証拠金の 2% の金額
-    pip_value = (
-        0.01 / entry_price if entry_price > 1 else 0.0001 / entry_price
-    )  # 1 pip の価値
-
-    # ユニット数を計算
-    units = int(risk_amount / (stop_loss_pips * pip_value))
-
-    return units
-
-
-# Lambdaハンドラー関数
 def lambda_handler(event, context):
     """毎日同じ通貨量を取引し積立を行う"""
     """[戦略] 1000万円分 = 約 125万ペソを 1ヶ月で買い切るため 約6万ペソ/日 購入し一月続ける"""
     """[戦略] レバレッジ 5倍をキープするとして、2年間複利運用すると 2年目での最終的な unit数は 41units になる見込み
         目標金額が 240Myen だとすると 5853658yen/month=unit となる。
         毎月 80万円入金し、5853658yen=40370$ 分購入を続ける"""
-    MONTHLY_AMOUNT = 5853658  # 円単位
-    if ACCOUNT_MODE == "DEMO":
-        MONTHLY_AMOUNT = 10000000  # 円単位（デモ）
-    DAILY_AMOUNT = MONTHLY_AMOUNT / 22  # 22日計算
+    # TODO: API 利用のための GOLD ステータス維持のため NY サーバでの取引量が 500,000$/月内 を超える必要がある
+    #   したがって、25,000$（* 5回）の USD を両建てでオーダーしその後決済するメンテナンス用コントローラを追加する必要がある
+
     try:
-        # インスタンスを作成
-        oanda = OANDA(
-            account_id=OANDA_ACCOUNT_ID,
-            api_key=OANDA_API_KEY,
-            api_url=OANDA_API_URL,
-        )
-        trade_manager = OANDA.Trade(oanda)
-        price_manager = OANDA.Price(oanda)
-        account_manager = OANDA.Account(oanda)
-        margin = account_manager.get_account_margin()
-        print(f"{margin=}")
-
-        # 現在価格のプライスマップを取得する
-        price_manager.generate_price_map()
-
-        # プライスマップから購入する USD 通貨量を計算する
-        accumulation = Accumulation(DAILY_AMOUNT, price_manager.price_map)
-        usd_amount = accumulation.dairy_usd_amount
-        print(f"{usd_amount=}")
-
-        # 求めた通貨量で USD/JPY と MXN/USD を取引する
-        # TODO: 証拠金残高の 2% でストップロスを設定する
-        trade_manager.place_order(units=usd_amount, instrument="USD_JPY")
-        trade_manager.place_order(
-            units=(-1 * usd_amount), instrument="USD_MXN"
-        )
-
-        return {
-            "statusCode": 200,
-            "body": f"{usd_amount}units Orders placed successfully",
-        }
-
+        logger.info("Starting execute_accumulation ...")
+        execute_accumulation()
+        logger.info("Success placing orders")
+        return {"statusCode": 200, "body": "Success placing orders"}
     except Exception as e:
-        print("Error:", str(e))
+        logger.error(str(e))
+        logger.error("Error placing orders")
         return {"statusCode": 500, "body": "Error placing orders"}
+
+
+def execute_accumulation():
+    # インスタンスの実体化
+    oanda = OANDA(
+        account_id=OANDA_ACCOUNT_ID,
+        api_key=OANDA_API_KEY,
+        api_url=OANDA_API_URL,
+        account_mode=ACCOUNT_MODE,
+    )
+    accumulation = Accumulation(platform=oanda, leverage=LEVERAGE)
+    # 当日の投資額を計算
+    daily_amount = accumulation.get_daily_amount(MONTHLY_AMOUNT)
+    # 買付けの実施
+    accumulation.execute_purchase(daily_amount)
 
 
 # ローカルテスト

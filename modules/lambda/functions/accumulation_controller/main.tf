@@ -9,13 +9,13 @@ resource "null_resource" "create_lambda_zip" {
 }
 
 resource "aws_lambda_function" "this" {
-  function_name = var.function_name
-  role          = var.role_arn
-  handler       = var.handler
-  runtime       = var.runtime
-  filename      = "${path.module}/lambda_function.zip"
+  function_name    = var.function_name
+  role             = var.role_arn
+  handler          = var.handler
+  runtime          = var.runtime
+  filename         = "${path.module}/lambda_function.zip"
   source_code_hash = filebase64sha256("${path.module}/lambda_function.zip")
-  timeout = 30
+  timeout          = 30
 
   depends_on = [null_resource.create_lambda_zip]
 
@@ -24,11 +24,33 @@ resource "aws_lambda_function" "this" {
   }
 }
 
+# Create CloudWatch Log Group
+resource "aws_cloudwatch_log_group" "lambda_log_group" {
+  name              = "/aws/lambda/${var.function_name}"
+  retention_in_days = 7
+}
+
+# CloudWatch Log Group Subscription Filters
+# CloudWatch Logs Subscription Filter to send logs to Lambda
+resource "aws_cloudwatch_log_subscription_filter" "log_filter_info" {
+  name            = var.info_filter_name
+  log_group_name  = aws_cloudwatch_log_group.lambda_log_group.name
+  filter_pattern  = "INFO"
+  destination_arn = var.log_processor_lambda_arn
+}
+
+resource "aws_cloudwatch_log_subscription_filter" "log_filter_error" {
+  name            = var.error_filter_name
+  log_group_name  = aws_cloudwatch_log_group.lambda_log_group.name
+  filter_pattern  = "ERROR"
+  destination_arn = var.log_processor_lambda_arn
+}
+
 # CloudWatch Event Rule to trigger Lambda on a schedule
 resource "aws_cloudwatch_event_rule" "lambda_schedule" {
-  name                = "${var.event_bridge_rule_name}"
+  name                = var.event_bridge_rule_name
   description         = "Triggers Lambda MON-FRI day at 12:00 PM JST"
-  schedule_expression = "cron(0 3 ? * MON-FRI *)"  # 平日 12時
+  schedule_expression = "cron(0 3 ? * MON-FRI *)" # 平日 12時
 }
 
 # CloudWatch Event Target to attach the Lambda to the rule
