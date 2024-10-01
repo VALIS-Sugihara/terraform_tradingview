@@ -11,6 +11,7 @@ from oandapyV20.endpoints.transactions import TransactionIDRange
 from typing import NamedTuple, Dict, List, Tuple
 from datetime import datetime, timedelta, date
 import logging
+import traceback
 
 logger = logging.getLogger(__name__)
 # ロガーのログレベルを設定する
@@ -814,6 +815,7 @@ def lambda_handler(event, context):
         return {"statusCode": 200, "body": "Success placing orders"}
     except Exception as e:
         logger.error(str(e))
+        logger.error(traceback.format_exc())
         logger.error("Error placing orders")
         return {"statusCode": 500, "body": "Error placing orders"}
 
