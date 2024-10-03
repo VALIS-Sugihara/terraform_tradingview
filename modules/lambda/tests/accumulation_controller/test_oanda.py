@@ -33,7 +33,7 @@ oanda = OANDA(
 class TestTrade:
 
     @patch("accumulation_controller.resources.lambda_function.orders.OrderCreate")
-    def test_place_order(self, mock_order_create):
+    def test_request_place_order(self, mock_order_create):
         # orders.OrderCreate が正しい引数を受けているかテストする
         expected_order_data = {
             "order": {
@@ -47,7 +47,7 @@ class TestTrade:
             }
         }
 
-        oanda.trade.place_order(expected_order_data)
+        oanda.trade.request_place_order(expected_order_data)
 
         mock_order_create.assert_called_once_with(
             oanda.account_id, data=expected_order_data
@@ -76,14 +76,14 @@ class TestTrade:
         assert actual_order_data == expected_order_data
 
     @patch("accumulation_controller.resources.lambda_function.positions.PositionClose")
-    def test_close_all_positions(self, mock_position_close):
+    def test_request_close_all_positions(self, mock_position_close):
         # positions.PositionClose が正しい引数を受けているかテストする
         expected_data = {
             "accountID": oanda.account_id,
             "instrument": "USD_JPY",
             "data": {"longUnits": "ALL"},
         }
-        oanda.trade.close_all_positions({"longUnits": "ALL"}, "USD_JPY")
+        oanda.trade.request_close_all_positions({"longUnits": "ALL"}, "USD_JPY")
         mock_position_close.assert_called_once_with(**expected_data)
 
     def test__make_all_positions_data(self):
@@ -118,7 +118,7 @@ class TestPrice:
             "TRY_JPY": (7, 8, 9),
         }
         with patch(
-            "accumulation_controller.resources.lambda_function.OANDA.Price.get_price",
+            "accumulation_controller.resources.lambda_function.OANDA.Price.request_price",
             side_effect=[(1, 2, 3), (4, 5, 6), (7, 8, 9)],
         ):
             oanda.price._generate_price_map()
@@ -127,21 +127,21 @@ class TestPrice:
         assert oanda.price.price_map["TRY_JPY"] == expected_data["TRY_JPY"]
 
     @patch("accumulation_controller.resources.lambda_function.pricing.PricingInfo")
-    def test_get_price_take_collect_args(self, mock_pricing_info):
+    def test_request_price_take_collect_args(self, mock_pricing_info):
         # 正しい引数を受け取っているかをテストする
         expected_data = {
             "accountID": oanda.account_id,
             "params": {"instruments": "USD_JPY"},
         }
-        oanda.price.get_price("USD_JPY")
+        oanda.price.request_price("USD_JPY")
         mock_pricing_info.assert_called_once_with(**expected_data)
 
-    def test_get_price_returns_collect_values(self):
+    def test_request_price_returns_collect_values(self):
         # 返す値が正しいかをテストする
         oanda.client.request.return_value = {
             "prices": [{"bids": [{"price": "100.000"}], "asks": [{"price": "200.000"}]}]
         }
-        prices = oanda.price.get_price("USD_JPY")
+        prices = oanda.price.request_price("USD_JPY")
 
         assert prices.bid == 100.000
         assert prices.ask == 200.000
@@ -149,12 +149,12 @@ class TestPrice:
 
         oanda.client.request = MagicMock()
 
-    def test_get_price_returns_PriceMap(self):
+    def test_request_price_returns_PriceMap(self):
         # 返す型が正しいかをテストする
         oanda.client.request.return_value = {
             "prices": [{"bids": [{"price": "100.000"}], "asks": [{"price": "200.000"}]}]
         }
-        prices = oanda.price.get_price("USD_JPY")
+        prices = oanda.price.request_price("USD_JPY")
 
         # 返り値が PriceMap (Dict[str, Prices]) かどうか確認
         assert isinstance(prices, oanda.Price.Prices)
@@ -165,10 +165,10 @@ class TestPrice:
 class TestAccount:
 
     @patch("accumulation_controller.resources.lambda_function.accounts.AccountSummary")
-    def test__get_account_summary_take_collect_args(self, mock_account_summary):
+    def test__request_account_summary_take_collect_args(self, mock_account_summary):
         # 正しい引数を受け取っているかをテストする
         expected_data = oanda.account_id
-        oanda.account._get_account_summary()
+        oanda.account._request_account_summary()
         mock_account_summary.assert_called_once_with(expected_data)
 
     # @patch("accumulation_controller.resources.lambda_function.accounts.AccountSummary")

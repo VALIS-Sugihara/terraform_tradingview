@@ -901,7 +901,6 @@ class CompoundInvestment(Investment):
                 transaction_detail
             )
 
-        logger.info(f"スワップポイント: {financing} 円")
         return financing
 
     @classmethod
@@ -978,6 +977,7 @@ def execute_compound_investment():
     compound_investment = CompoundInvestment(platform=oanda, leverage=LEVERAGE)
     # 当日スワップポイントの取得
     swap_points = compound_investment.get_daily_swap_points(oanda)
+    logger.info(f"スワップポイント: {swap_points} 円 分の買付けを行います")
     # 買付け実施
     compound_investment.execute_purchase(swap_points)
 

@@ -184,12 +184,12 @@ class TestAccumulation:
         accumulation.calcurate_usdjpy_amount.return_value = 100
         accumulation.calcurate_tryjpy_amount = MagicMock()
         accumulation.calcurate_tryjpy_amount.return_value = 300
-        accumulation.platform.trade.place_order = MagicMock()
+        accumulation.platform.trade.request_place_order = MagicMock()
 
         accumulation.execute_purchase(100)
 
         # 注）2回目だけ Short なので - が入っているかを検証
-        accumulation.platform.trade.place_order.assert_has_calls(
+        accumulation.platform.trade.request_place_order.assert_has_calls(
             [
                 call(
                     {

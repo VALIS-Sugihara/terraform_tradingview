@@ -90,7 +90,7 @@ class OANDA:
         def __init__(self, oanda) -> None:
             self.oanda = oanda
 
-        def place_order(self, order_data: dict):
+        def request_place_order(self, order_data: dict):
             """マーケットオーダーを送信する関数
 
             Args:
@@ -141,7 +141,7 @@ class OANDA:
             }
             return order_data
 
-        def close_all_positions(
+        def request_close_all_positions(
             self,
             all_positions_data: dict,
             instrument="USD_JPY",
@@ -166,7 +166,7 @@ class OANDA:
                 )
                 response = self.oanda.client.request(request)
 
-                # print(
+                # logger.info(
                 #     "position close: {} at {}. pl: {}".format(
                 #         response.get(f"{close_action}OrderFillTransaction").get(
                 #             "units"
@@ -210,7 +210,7 @@ class OANDA:
             return all_positions_data
 
         # ポジション決済を送信する関数
-        def position_close(
+        def request_position_close(
             self,
             close_action: str,
             units,
@@ -244,7 +244,7 @@ class OANDA:
                     )
                     response = self.oanda.client.request(request)
 
-                    print(
+                    logger.info(
                         "position close: {} at {}. pl: {}".format(
                             response.get("longOrderFillTransaction").get("units"),
                             response.get("longOrderFillTransaction").get("price"),
@@ -264,7 +264,7 @@ class OANDA:
                     )
                     response = self.oanda.client.request(request)
 
-                    print(
+                    logger.info(
                         "position close: {} at {}. pl: {}".format(
                             response.get("shortOrderFillTransaction").get("units"),
                             response.get("shortOrderFillTransaction").get("price"),
@@ -306,11 +306,11 @@ class OANDA:
             self.price_map = {}
             logger.info("price_map を生成します")
             for currency_pair in self.main_currency_pairs:
-                prices = self.get_price(instruments=currency_pair)
+                prices = self.request_price(instruments=currency_pair)
                 self.price_map[currency_pair] = prices
             logger.info(f"{self.price_map=}")
 
-        def get_price(self, instruments: str):
+        def request_price(self, instruments: str):
             """価格取得関数
                 中値を計算し返す > bid, ask, mid を返す
             Args:
@@ -363,9 +363,9 @@ class OANDA:
 
         def __init__(self, oanda) -> None:
             self.oanda = oanda
-            self.account_summary = self._get_account_summary()
+            self.account_summary = self._request_account_summary()
 
-        def _get_account_summary(self):
+        def _request_account_summary(self):
             """口座情報を取得する関数
 
             Returns:
@@ -473,11 +473,170 @@ class OANDA:
             nav = float(self.account_summary["NAV"])
             return nav
 
+        def request_transaction_list_between_dates(
+            self,
+            from_date: str,
+            to_date: str,
+            transaction_type: str = "DAILY_FINANCING",
+        ):
+            """トランザクションリストを日付間指定で取得する関数
+
+            Args:
+                from_date (str): from の日付. 2024-10-02 の形式
+                to_date (str): to の日付. 2024-10-03 の形式
+                transaction_type (str): DAILY_FINANCING etc...
+
+            Returns:
+                (dict): 以下の形式のトランザクションデータ
+                response={
+                    'from': '2024-10-01T04:00:00.000000000Z',
+                    'to': '2024-10-03T04:00:00.000000000Z',
+                    'pageSize': 100,
+                    'type': ['DAILY_FINANCING'],
+                    'count': 2,
+                    'pages': ['https://api-fxpractice.oanda.com/v3/accounts/101-009-30020937-001/transactions/idrange?from=114&to=121&type=DAILY_FINANCING'],
+                    'lastTransactionID': '121'
+                }
+            """
+            # Get the transactions
+            params = {
+                "from": from_date,
+                "to": to_date,
+                "type": transaction_type,  # Filter for DAILY_INTEREST transaction types
+                "pageSize": 100,  # Adjust page size as needed
+            }
+            request = transactions.TransactionList(
+                accountID=self.oanda.account_id, params=params
+            )
+            response = self.oanda.client.request(request)
+            return response
+
+        def get_transaction_id_by_list(self, list_data: dict, key: str):
+            """トランザクションリストの返り値から目的の id を抽出する
+                'pages': ['https://api-fxpractice.oanda.com/v3/accounts/101-009-30020937-001/transactions/idrange?from=114&to=121&type=DAILY_FINANCING'],
+            のようになっており、from や to の =114 から 114 を正規表現で抜き出して返す
+            TODO: pages のデータが存在しており 1つであることを前提としているためエラーハンドリングについて考慮
+
+            Args:
+                list_data (dict): self.request_transaction_list_between_dates()
+                key (str): 目的のキー ex) "from", "to" etc...
+
+            Returns:
+                str: 目的の id
+            """
+            page = list_data["pages"][0]
+            ptn = re.compile(rf"{key}=(\d+)")
+            target_id = re.findall(ptn, page)[0]
+            return target_id
+
+        def request_transaction_details_by_id(self, id: int):
+            """トランザクション詳細を id から取得する関数
+
+            Args:
+                id (int): transactionID
+
+            Returns:
+                (dict): 以下の形式のトランザクション詳細データ
+                response = {
+                    "transaction": {
+                        "id": "121",
+                        "accountID": "101-009-30020937-001",
+                        "userID": 30020937,
+                        "batchID": "121",
+                        "time": "2024-10-02T21:00:00.000000000Z",
+                        "type": "DAILY_FINANCING",
+                        "financing": "308.7064",
+                        "accountBalance": "3000583.9766",
+                        "positionFinancings": [
+                            {
+                                "instrument": "USD_JPY",
+                                "financing": "-296.9144",
+                                "baseFinancing": "-2.02303561643840",
+                                "accountFinancingMode": "DAILY_INSTRUMENT",
+                                "homeConversionFactors": {
+                                    "gainQuoteHome": None,
+                                    "lossQuoteHome": None,
+                                    "gainBaseHome": {"factor": "146.181052"},
+                                    "lossBaseHome": {"factor": "146.766948"},
+                                },
+                                "openTradeFinancings": [
+                                    {
+                                        "tradeID": "5",
+                                        "financing": "-221.1557",
+                                        "baseFinancing": "-1.50684931506849",
+                                        "financingRate": "-0.0055",
+                                        "baseHomeConversionCost": "-0.42183945205479",
+                                        "homeConversionCost": "-0.42183945205479",
+                                    },
+                                ],
+                            },
+                        ],
+                        "baseHomeConversionCost": "-1.42472923877042",
+                        "homeConversionCost": "-1.42472923877042",
+                    },
+                    "lastTransactionID": "121",
+                }
+            """
+            request = transactions.TransactionDetails(
+                accountID=self.oanda.account_id, transactionID=id
+            )
+            response = self.oanda.client.request(request)
+            return response
+
+        def request_transaction_id_range(
+            self,
+            from_id: str,
+            to_id: str,
+            transaction_type: str = "DAILY_FINANCING",
+        ):
+            """トランザクションリストを日付間指定で取得する関数
+
+            Args:
+                from_id (str): from の id. str でも int でも良さそう
+                to_id (str): to の id. str でも int でも良さそう
+                transaction_type (str): DAILY_FINANCING etc...
+
+            Returns:
+                (dict): 以下の形式のトランザクションデータ
+                response={
+                    'transactions': [
+                        self.request_transaction_details_by_id(),
+                        self.request_transaction_details_by_id(),
+                        ...
+                    ]
+                }
+            """
+
+            # Get the transactions
+            params = {
+                "from": from_id,
+                "to": to_id,
+                "type": transaction_type,  # Filter for DAILY_INTEREST transaction types
+                "pageSize": 100,  # Adjust page size as needed
+            }
+            request = transactions.TransactionIDRange(
+                accountID=self.oanda.account_id, params=params
+            )
+            response = self.oanda.client.request(request)
+            return response
+
+        def get_financing_by_transaction_details(self, details_data: dict):
+            """トランザクション詳細データから swap である financing の値を float にして返す
+
+            Args:
+                details_data (dict): self.request_transaction_details_by_id()
+
+            Returns:
+                (float): swap 額
+            """
+            financing = details_data.get("transaction", {}).get("financing", 0)
+            return float(financing)
+
         def get_swap_points(self):
             # オープンポジションの情報を取得
             r = positions.OpenPositions(accountID=self.oanda.account_id)
             response = self.oanda.client.request(r)
-            print(f"{response=}")
+            logger.info(f"{response=}")
 
             # レスポンスからスワップポイントを抽出
             open_positions = r.response.get("positions", [])
@@ -485,7 +644,7 @@ class OANDA:
                 instrument = position["instrument"]
                 long_swap = position["long"]["financing"]
                 short_swap = position["short"]["financing"]
-                print(
+                logger.info(
                     f"Instrument: {instrument}, Long Swap: {long_swap}, Short Swap: {short_swap}"
                 )
                 """
@@ -519,8 +678,8 @@ class OANDA:
                 accountID=self.oanda.account_id, params=params
             )
             response = self.oanda.client.request(r)
-            print(params)
-            print(f"{response=}")
+            logger.info(params)
+            logger.info(f"{response=}")
             exit()
             # transactions = TransactionIDRange(accountID=self.oanda.account_id, params=params)
             # response = self.oanda.client.request(transactions)
@@ -532,7 +691,7 @@ class OANDA:
                     "TRADE_OPEN",
                     "TRADE_CLOSE",
                 ]:
-                    print(transaction)
+                    logger.info(transaction)
 
 
 class Investment:
@@ -734,20 +893,23 @@ class Accumulation(Investment):
             usd_order_data = self.platform.trade._make_order_data(
                 units=usd_amount, instrument="USD_JPY"
             )
-            self.platform.trade.place_order(usd_order_data)
+            self.platform.trade.request_place_order(usd_order_data)
+            logger.info(f"USD_JPY を {usd_amount} 枚発注しました")
             # USD_MXN の Short
             # TODO: stoploss の設定
             mxn_amount = -1 * mxn_amount  # Short のため - 数量にする
             mxn_order_data = self.platform.trade._make_order_data(
                 units=mxn_amount, instrument="USD_MXN"
             )
-            self.platform.trade.place_order(mxn_order_data)
+            self.platform.trade.request_place_order(mxn_order_data)
+            logger.info(f"USD_MXN を {mxn_amount} 枚発注しました")
             # TRY_JPY の Long
             # TODO: stoploss の設定
             try_order_data = self.platform.trade._make_order_data(
                 units=try_amount, instrument="TRY_JPY"
             )
-            self.platform.trade.place_order(try_order_data)
+            self.platform.trade.request_place_order(try_order_data)
+            logger.info(f"TRY_JPY を {try_amount} 枚発注しました")
 
     @classmethod
     def get_daily_amount(cls, monthly_amount: int, target_date: date = None):
@@ -833,6 +995,7 @@ def execute_accumulation():
     accumulation = Accumulation(platform=oanda, leverage=LEVERAGE)
     # 当日の投資額を計算
     daily_amount = accumulation.get_daily_amount(MONTHLY_AMOUNT)
+    logger.info(f"当日分: {daily_amount} 円 分の買付けを行います")
     # 買付けの実施
     accumulation.execute_purchase(daily_amount)
 
