@@ -615,7 +615,9 @@ class Investment:
         # 有効残高 / 維持証拠金 が 110% 以下の場合は False
         margin_used = self.platform.account.get_margin_used()
         nav = self.platform.account.get_net_asset_value()
-        if (nav / margin_used) * 100 < 110:
+        if (
+            margin_used != 0 and (nav / margin_used) * 100 < 110
+        ):  # 初期状態では維持証拠金 0円のため回避
             flag = False
             return flag
 

@@ -146,6 +146,22 @@ class TestInvestment:
         investment.platform.account.get_margin_used.return_value = 500000
         investment.platform.account.get_net_asset_value.return_value = 3000000
 
+    def test_verify_purchase_requirements_division_zero_is_true(self):
+        # 維持証拠金 が 0円の場合は回避し True が返ることをテストする
+        investment.platform.account.get_margin_used = MagicMock()
+        investment.platform.account.get_margin_used.return_value = 0
+        investment.platform.account.get_net_asset_value = MagicMock()
+        investment.platform.account.get_net_asset_value.return_value = 2100000
+        expected_flag = True
+        currency_pair_amounts = {"USD_JPY": 10000}
+        price_map = {"USD_JPY": OANDA.Price.Prices(90, 100, 95)}  # bid,ask,mid
+        actual_flag = investment.verify_purchase_requirements(
+            currency_pair_amounts, price_map
+        )
+        assert expected_flag == actual_flag
+        investment.platform.account.get_margin_used.return_value = 500000
+        investment.platform.account.get_net_asset_value.return_value = 3000000
+
     def test_count_weekdays_in_month(self):
         # 正しい値が返っているかをテストする
         # 2024/09 は平日が 21日
