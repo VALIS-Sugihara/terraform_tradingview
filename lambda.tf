@@ -95,7 +95,7 @@ module "lambda_pers_accumulation_controller" {
     OANDA_API_URL       = local.PERS_OANDA_API_URL
     ACCOUNT_MODE        = local.ACCOUNT_MODE_PERS # 個人環境
     MONTHLY_AMOUNT      = 800000
-    LEVERAGE            = 7.7
+    LEVERAGE            = 3.0
   }
   log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn
   log_processor_lambda_name = aws_lambda_function.log_processor_lambda.function_name
@@ -118,6 +118,72 @@ module "lambda_corp_accumulation_controller" {
     OANDA_API_URL       = local.CORP_OANDA_API_URL
     ACCOUNT_MODE        = local.ACCOUNT_MODE_CORP # 法人環境
     MONTHLY_AMOUNT      = 800000
+    LEVERAGE            = 3.0
+  }
+  log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn
+  log_processor_lambda_name = aws_lambda_function.log_processor_lambda.function_name
+  logs_role_arn             = aws_iam_role.log_to_lambda_role.arn
+  info_filter_name          = local.INFO_FILTER_NAME
+  error_filter_name         = local.ERROR_FILTER_NAME
+}
+
+module "lambda_demo_compound_investment_controller" {
+  source                 = "./modules/lambda/functions/compound_investment_controller"
+  function_name          = "${local.project_name}-demo-compound_investment-controller-function"
+  event_bridge_rule_name = "${local.project_name}-demo-compound_investment-rule"
+  function_path          = "compound_investment_controller"
+  handler                = "lambda_function.lambda_handler"
+  runtime                = "python3.12"
+  role_arn               = aws_iam_role.lambda_exec.arn
+  environment_variables = {
+    OANDA_RESTAPI_TOKEN = local.DEMO_OANDA_RESTAPI_TOKEN
+    OANDA_ACCOUNT_ID    = local.DEMO_OANDA_ACCOUNT_ID
+    OANDA_API_URL       = local.DEMO_OANDA_API_URL
+    ACCOUNT_MODE        = local.ACCOUNT_MODE_DEMO # デモ環境
+    LEVERAGE            = 7.7
+  }
+  log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn
+  log_processor_lambda_name = aws_lambda_function.log_processor_lambda.function_name
+  logs_role_arn             = aws_iam_role.log_to_lambda_role.arn
+  info_filter_name          = local.INFO_FILTER_NAME
+  error_filter_name         = local.ERROR_FILTER_NAME
+}
+
+module "lambda_pers_compound_investment_controller" {
+  source                 = "./modules/lambda/functions/compound_investment_controller"
+  function_name          = "${local.project_name}-pers-compound_investment-controller-function"
+  event_bridge_rule_name = "${local.project_name}-pers-compound_investment-rule"
+  function_path          = "compound_investment_controller"
+  handler                = "lambda_function.lambda_handler"
+  runtime                = "python3.12"
+  role_arn               = aws_iam_role.lambda_exec.arn
+  environment_variables = {
+    OANDA_RESTAPI_TOKEN = local.PERS_OANDA_RESTAPI_TOKEN
+    OANDA_ACCOUNT_ID    = local.PERS_OANDA_ACCOUNT_ID
+    OANDA_API_URL       = local.PERS_OANDA_API_URL
+    ACCOUNT_MODE        = local.ACCOUNT_MODE_PERS # 個人環境
+    LEVERAGE            = 3.0
+  }
+  log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn
+  log_processor_lambda_name = aws_lambda_function.log_processor_lambda.function_name
+  logs_role_arn             = aws_iam_role.log_to_lambda_role.arn
+  info_filter_name          = local.INFO_FILTER_NAME
+  error_filter_name         = local.ERROR_FILTER_NAME
+}
+
+module "lambda_corp_compound_investment_controller" {
+  source                 = "./modules/lambda/functions/compound_investment_controller"
+  function_name          = "${local.project_name}-corp-compound_investment-controller-function"
+  event_bridge_rule_name = "${local.project_name}-corp-compound_investment-rule"
+  function_path          = "compound_investment_controller"
+  handler                = "lambda_function.lambda_handler"
+  runtime                = "python3.12"
+  role_arn               = aws_iam_role.lambda_exec.arn
+  environment_variables = {
+    OANDA_RESTAPI_TOKEN = local.CORP_OANDA_RESTAPI_TOKEN
+    OANDA_ACCOUNT_ID    = local.CORP_OANDA_ACCOUNT_ID
+    OANDA_API_URL       = local.CORP_OANDA_API_URL
+    ACCOUNT_MODE        = local.ACCOUNT_MODE_CORP # 法人環境
     LEVERAGE            = 3.0
   }
   log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn

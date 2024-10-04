@@ -13,9 +13,6 @@ from datetime import datetime, timedelta, date
 import logging
 import traceback
 
-logger = logging.getLogger(__name__)
-# ロガーのログレベルを設定する
-logger.setLevel(logging.INFO)
 
 # OANDAのAPI設定
 OANDA_ACCOUNT_ID = os.environ["OANDA_ACCOUNT_ID"]
@@ -29,6 +26,22 @@ try:
     ACCOUNT_MODE = os.environ["ACCOUNT_MODE"]
 except Exception:
     raise Exception("ACCOUNT_MODE が設定されていません")
+
+logger = logging.getLogger(__name__)
+# ロガーのログレベルを設定する
+logger.setLevel(logging.INFO)
+
+# フォーマットの設定  [INFO] 2024-10-04 01:51:05,787 : <PERS> : test
+formatter = logging.Formatter(
+    f"[%(levelname)s] %(asctime)s : <{ACCOUNT_MODE}> : %(message)s"
+)
+
+# ハンドラーの設定
+handler = logging.StreamHandler()  # Lambda の標準出力にログを出力
+handler.setFormatter(formatter)  # ハンドラーにフォーマッターを適用
+
+# ロガーにハンドラーを追加
+logger.handlers = [handler]  # 既存のハンドラーを上書きするため、リストで設定
 
 
 class OANDA:

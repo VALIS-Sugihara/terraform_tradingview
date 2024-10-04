@@ -276,18 +276,16 @@ class TestAccount:
         # 正しい値を返しているかをテスト
         expected_value = 123456.789
         details_data = {
-            "transaction": {
-                "id": "121",
-                "accountID": "101-009-30020937-001",
-                "userID": 30020937,
-                "type": "DAILY_FINANCING",
-                "financing": "123456.789",
-                "positionFinancings": [
-                    {
-                        "instrument": "USD_JPY",
-                    }
-                ],
-            }
+            "id": "121",
+            "accountID": "101-009-30020937-001",
+            "userID": 30020937,
+            "type": "DAILY_FINANCING",
+            "financing": "123456.789",
+            "positionFinancings": [
+                {
+                    "instrument": "USD_JPY",
+                }
+            ],
         }
         actual_value = oanda.account.get_financing_by_transaction_details(
             details_data=details_data
@@ -297,18 +295,16 @@ class TestAccount:
     def test_get_financing_by_transaction_details_return_float(self):
         # float を返しているかをテスト
         details_data = {
-            "transaction": {
-                "id": "121",
-                "accountID": "101-009-30020937-001",
-                "userID": 30020937,
-                "type": "DAILY_FINANCING",
-                "financing": "123456.789",
-                "positionFinancings": [
-                    {
-                        "instrument": "USD_JPY",
-                    }
-                ],
-            }
+            "id": "121",
+            "accountID": "101-009-30020937-001",
+            "userID": 30020937,
+            "type": "DAILY_FINANCING",
+            "financing": "123456.789",
+            "positionFinancings": [
+                {
+                    "instrument": "USD_JPY",
+                }
+            ],
         }
         actual_value = oanda.account.get_financing_by_transaction_details(
             details_data=details_data

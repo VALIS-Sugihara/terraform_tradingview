@@ -15,9 +15,6 @@ import logging
 import traceback
 import re
 
-logger = logging.getLogger(__name__)
-# ロガーのログレベルを設定する
-logger.setLevel(logging.INFO)
 
 JST = ZoneInfo("Asia/Tokyo")
 
@@ -26,13 +23,29 @@ OANDA_ACCOUNT_ID = os.environ["OANDA_ACCOUNT_ID"]
 OANDA_API_KEY = os.environ["OANDA_RESTAPI_TOKEN"]
 OANDA_API_URL = os.environ["OANDA_API_URL"]
 
-MONTHLY_AMOUNT = int(os.environ["MONTHLY_AMOUNT"])  # 月単位の設定積立額
 LEVERAGE = float(os.environ["LEVERAGE"])  # カスタム設定レバレッジ
 
 try:
     ACCOUNT_MODE = os.environ["ACCOUNT_MODE"]
 except Exception:
     raise Exception("ACCOUNT_MODE が設定されていません")
+
+
+logger = logging.getLogger(__name__)
+# ロガーのログレベルを設定する
+logger.setLevel(logging.INFO)
+
+# フォーマットの設定  [INFO] 2024-10-04 01:51:05,787 : <PERS> : test
+formatter = logging.Formatter(
+    f"[%(levelname)s] %(asctime)s : <{ACCOUNT_MODE}> : %(message)s"
+)
+
+# ハンドラーの設定
+handler = logging.StreamHandler()  # Lambda の標準出力にログを出力
+handler.setFormatter(formatter)  # ハンドラーにフォーマッターを適用
+
+# ロガーにハンドラーを追加
+logger.handlers = [handler]  # 既存のハンドラーを上書きするため、リストで設定
 
 
 class OANDA:
@@ -633,7 +646,7 @@ class OANDA:
             Returns:
                 (float): swap 額
             """
-            financing = details_data.get("transaction", {}).get("financing", 0)
+            financing = details_data["financing"]
             return float(financing)
 
         def get_swap_points(self):
@@ -904,7 +917,7 @@ class CompoundInvestment(Investment):
         return financing
 
     @classmethod
-    def make_between_dates_based_on_day(cls, target_datetime: datetime):
+    def make_between_dates_based_on_day(cls, target_datetime: datetime = None):
         """月曜日であれば
                 from: 3日前（土曜日）の yyyy-mm-dd と to: 当日の yyyy-mm-dd を
             それ以外であれば、
@@ -976,7 +989,7 @@ def execute_compound_investment():
     )
     compound_investment = CompoundInvestment(platform=oanda, leverage=LEVERAGE)
     # 当日スワップポイントの取得
-    swap_points = compound_investment.get_daily_swap_points(oanda)
+    swap_points = compound_investment.get_daily_swap_points()
     logger.info(f"スワップポイント: {swap_points} 円 分の買付けを行います")
     # 買付け実施
     compound_investment.execute_purchase(swap_points)
@@ -984,4 +997,10 @@ def execute_compound_investment():
 
 # ローカルテスト
 if __name__ == "__main__":
+    logger = logging.getLogger(__name__)
+    # ロガーのログレベルを設定する
+    logger.setLevel(logging.INFO)
+    logger.error("test")
+    exit()
+
     lambda_handler(None, None)
