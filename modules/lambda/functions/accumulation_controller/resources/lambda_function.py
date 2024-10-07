@@ -1009,6 +1009,9 @@ def execute_accumulation():
     # 当日の投資額を計算
     daily_amount = accumulation.get_daily_amount(MONTHLY_AMOUNT)
     logger.info(f"当日分: {daily_amount} 円 分の買付けを行います")
+    if daily_amount == 0:
+        logger.error("買付け計算金額が 0円です")
+        return
     # 買付けの実施
     accumulation.execute_purchase(daily_amount)
 
