@@ -4,7 +4,7 @@ locals {
   ACCOUNT_MODE_PERS        = "PERS"                                                              # 個人用本番環境であることを示す
   ACCOUNT_MODE_CORP        = "CORP"                                                              # 法人用本番環境であることを示す
   PERS_OANDA_ACCOUNT_ID    = "001-009-12298567-001"                                              # for PERS
-  PERS_OANDA_RESTAPI_TOKEN = "943477fc4e952452ce1fc2f88fa3d8bf-40be1a4b46642007286ce4d82676b759" # for PERS
+  PERS_OANDA_RESTAPI_TOKEN = "8af54054da44f354d76fa4340dd8f935-dfa8a10745fb7349140f0b3b801e5803" # for PERS
   PERS_OANDA_API_URL       = "https://api-fxtrade.oanda.com"                                     # デモアカウントの場合 "https://api-fxpractice.oanda.com"。ライブアカウントの場合は'https://api-fxtrade.oanda.com'
   DEMO_OANDA_ACCOUNT_ID    = "101-009-30020937-001"                                              # for DEMO
   DEMO_OANDA_RESTAPI_TOKEN = "6197f9b13865185a88321925cb9d0e44-f2cbf4f1305c54dcb0a16422f76fb69c" # for DEMO
