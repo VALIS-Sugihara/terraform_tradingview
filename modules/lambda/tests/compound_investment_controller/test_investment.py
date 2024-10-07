@@ -260,16 +260,16 @@ class TestCompoundInvestment:
         assert expected_value == actual_value
 
     def test_make_between_dates_based_on_day_return_collect_value_on_monday(self):
-        # 月曜日指定で正しい from 日付, to 日付 を返していることをテストする
-        target_datetime = datetime(2024, 9, 30)  # 2024/09/30 は月曜日
-        expected_value = ("2024-09-27", "2024-09-30")
+        # 日曜日指定で正しい from 日付, to 日付 を返していることをテストする
+        target_datetime = datetime(2024, 9, 29)  # 2024/09/29 は日曜日
+        expected_value = ("2024-09-26", "2024-09-29")
         actual_value = CompoundInvestment.make_between_dates_based_on_day(
             target_datetime=target_datetime
         )
         assert expected_value == actual_value
 
     def test_make_between_dates_based_on_day_return_collect_value_on_monday_else(self):
-        # 月曜日以外の指定で正しい from 日付, to 日付 を返していることをテストする
+        # 日曜日以外の指定で正しい from 日付, to 日付 を返していることをテストする
         target_datetime = datetime(2024, 10, 3)  # 2024/10/03 は木曜日
         expected_value = ("2024-10-02", "2024-10-03")
         actual_value = CompoundInvestment.make_between_dates_based_on_day(

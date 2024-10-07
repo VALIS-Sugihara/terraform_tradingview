@@ -928,8 +928,9 @@ class CompoundInvestment(Investment):
         Returns:
             (tuple): (from: str, to: str) 対象日の yyyy-mm-dd の組み合わせ
         """
-        today = datetime.now() if target_datetime is None else target_datetime
-        if today.weekday() == 0:  # 0 is Monday
+        # UTC ベースで算出（月曜 07:00 実行時時点では日曜であるため日曜を判定する）
+        today = datetime.now(UTC) if target_datetime is None else target_datetime
+        if today.weekday() == 6:  # 0 is Monday
             from_date = today - timedelta(days=3)
         else:
             from_date = today - timedelta(days=1)
