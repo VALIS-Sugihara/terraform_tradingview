@@ -94,7 +94,7 @@ module "lambda_pers_accumulation_controller" {
     OANDA_ACCOUNT_ID    = local.PERS_OANDA_ACCOUNT_ID
     OANDA_API_URL       = local.PERS_OANDA_API_URL
     ACCOUNT_MODE        = local.ACCOUNT_MODE_PERS # 個人環境
-    MONTHLY_AMOUNT      = 800000
+    MONTHLY_AMOUNT      = 80000
     LEVERAGE            = 3.0
   }
   log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn
