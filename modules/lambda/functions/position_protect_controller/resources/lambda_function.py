@@ -9,7 +9,7 @@ from oandapyV20.endpoints import (
     trades,
 )
 from typing import NamedTuple, Dict, List, Tuple
-from datetime import datetime, timedelta, date, UTC, timezone
+from datetime import datetime, timedelta, date, UTC, timezone, time
 from zoneinfo import ZoneInfo
 import logging
 import traceback
@@ -1137,13 +1137,58 @@ class PositionProtect:
         """
         return instrument in self.platform.Price.main_currency_pairs
 
+    @classmethod
+    def is_within_business_hours_of_oanda(cls, target_utc_datetime: datetime = None):
+        """OANDA の下記営業時間内かどうかを判定する関数
+            月曜 6:00 - 土曜 05:59 JST
+            ・午前 6 時 59 分から午前 7 時 5 分 （米国標準時間適用期間）
+            ・午前 5 時 59 分から午前 6 時 5 分 （米国夏時間適用期間）
+            ※米国東部時間 午後 4 時 59 分から午後 5 時 05 分の 6 分間
+
+        Args:
+            target_utc_datetime (datetime): UTC ベースでの指定日時  Default.None
+
+        Returns:
+            (boolean): True | False
+        """
+        # 現在の UTC 時刻を取得、または指定 UTC 時刻を取得
+        now_utc = datetime.now(timezone.utc) if not target_utc_datetime else target_utc_datetime
+        # ここで 9 時間加算した上で JST に変換する
+        now_jst = now_utc + timedelta(hours=9)
+
+        # 営業時間帯の除外リストを設定
+        # 午前 6 時 59 分から午前 7 時 5 分
+        excluded_times_morning = [
+            (time(6, 59), time(7, 5))
+        ]
+        # 午前 5 時 59 分から午前 6 時 5 分
+        excluded_times_night = [
+            (time(5, 59), time(6, 5))
+        ]
+
+        # 現在時刻が除外時間内に入っているかどうかをチェック
+        for start, end in excluded_times_morning + excluded_times_night:
+            if start <= now_jst.time() <= end:
+                return False
+
+        # 営業開始は月曜日 06:00 JST
+        start_of_business = now_jst.replace(hour=6, minute=0, second=0, microsecond=0)
+        while start_of_business.weekday() != 0:  # 0 = Monday
+            start_of_business -= timedelta(days=1)
+
+        # 営業終了は土曜日 05:59 JST
+        end_of_business = start_of_business + timedelta(days=4, hours=23, minutes=59)
+
+        # 現在が営業時間内であれば True を返す
+        return start_of_business <= now_jst <= end_of_business
+
 
 # Lambdaハンドラー関数
 def lambda_handler(event, context):
     """閾値を下回っていた場合ポジション数の調整を行う"""
     try:
         execute_position_protect()
-        return {"statusCode": 200, "body": "Success placing orders"}
+        return {"statusCode": 200, "body": "Success position protect"}
     except Exception as e:
         logger.error(str(e))
         logger.error(traceback.format_exc())
@@ -1152,21 +1197,23 @@ def lambda_handler(event, context):
 
 
 def execute_position_protect():
-    # PositionProtect クラスの実体化
-    oanda = OANDA(
-        account_id=OANDA_ACCOUNT_ID,
-        api_key=OANDA_API_KEY,
-        api_url=OANDA_API_URL,
-        account_mode=ACCOUNT_MODE,
-    )
-    position_protect = PositionProtect(oanda, PROTECTION_THRESHOLD)
+    # 5分おきに実行の想定のため営業時間の判定を設ける
+    if PositionProtect.is_within_business_hours_of_oanda():
+        # PositionProtect クラスの実体化
+        oanda = OANDA(
+            account_id=OANDA_ACCOUNT_ID,
+            api_key=OANDA_API_KEY,
+            api_url=OANDA_API_URL,
+            account_mode=ACCOUNT_MODE,
+        )
+        position_protect = PositionProtect(oanda, PROTECTION_THRESHOLD)
 
-    each_currency_position = {}
-    while position_protect.is_under_threshold() is True:
-        logger.info(f"口座維持率が {PROTECTION_THRESHOLD}% を下回りました。ポジション調整を行います...")
-        each_currency_position = position_protect.trim_position(each_currency_position)
-        position_protect.platform.account.update_account_summary()
-        logger.info(f"現在の口座維持率は {(position_protect.platform.account.get_net_asset_value()/position_protect.platform.account.get_margin_used())*100}% です")
+        each_currency_position = {}
+        while position_protect.is_under_threshold() is True:
+            logger.info(f"口座維持率が {PROTECTION_THRESHOLD}% を下回りました。ポジション調整を行います...")
+            each_currency_position = position_protect.trim_position(each_currency_position)
+            position_protect.platform.account.update_account_summary()
+            logger.info(f"現在の口座維持率は {(position_protect.platform.account.get_net_asset_value()/position_protect.platform.account.get_margin_used())*100}% です")
 
 
 # ローカルテスト

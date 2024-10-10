@@ -669,10 +669,105 @@ class TestPositionProtect:
         # 条件を満たさなかった場合再帰的に呼び出しされていることを確認する
         pass
 
-    def test_is_within_business_hours(self, position_protect):
-        # 営業時間内の判定が正しいことを確認する
-        # 6:00 mon -05:59 sat JST
-        # ・午前 6 時 59 分から午前 7 時 5 分 （米国標準時間適用期間）
-        # ・午前 5 時 59 分から午前 6 時 5 分 （米国夏時間適用期間）
-        # ※米国東部時間　午後 4 時 59 分から午後 5 時 05 分の 6 分間
-        pass
+    def test_is_within_business_hours_of_oanda_with_monday(self, position_protect):
+        # 月曜日の営業時間内の判定が正しいことを確認する
+        expected_flag = True
+        target_datetime = datetime(
+            2024, 10, 7
+        )  # UTC 10/7 0:00 月曜日 は JST 10/7 月曜日 09:00
+        actual_flag = position_protect.is_within_business_hours_of_oanda(
+            target_datetime
+        )
+        assert expected_flag == actual_flag
+        expected_flag = True
+        target_datetime = datetime(
+            2024, 10, 6, 21, 6
+        )  # UTC 10/6 21:06 日曜日 は JST 10/7 06:06 月曜日
+        actual_flag = position_protect.is_within_business_hours_of_oanda(
+            target_datetime
+        )
+        assert expected_flag == actual_flag
+        expected_flag = False
+        target_datetime = datetime(
+            2024, 10, 6, 20, 58
+        )  # UTC 10/6 20:58 日曜日 は JST 10/7 05:58 月曜日
+        actual_flag = position_protect.is_within_business_hours_of_oanda(
+            target_datetime
+        )
+        assert expected_flag == actual_flag
+
+    def test_is_within_business_hours_of_oanda_with_saturday(self, position_protect):
+        # 土曜日の営業時間内の判定が正しいことを確認する
+        expected_flag = False
+        target_datetime = datetime(
+            2024, 10, 5
+        )  # UTC 10/5 0:00 土曜日 は JST 10/5 土曜日 09:00
+        actual_flag = position_protect.is_within_business_hours_of_oanda(
+            target_datetime
+        )
+        assert expected_flag == actual_flag
+        expected_flag = False
+        target_datetime = datetime(
+            2024, 10, 4, 21, 6
+        )  # UTC 10/4 21:06 金曜日 は JST 10/5 06:06 土曜日
+        actual_flag = position_protect.is_within_business_hours_of_oanda(
+            target_datetime
+        )
+        assert expected_flag == actual_flag
+        expected_flag = True
+        target_datetime = datetime(
+            2024, 10, 4, 20, 58
+        )  # UTC 10/4 20:58 金曜日 は JST 10/5 05:58 土曜日
+        actual_flag = position_protect.is_within_business_hours_of_oanda(
+            target_datetime
+        )
+        assert expected_flag == actual_flag
+
+    def test_is_within_business_hours_of_oanda_with_excluded_times(
+        self, position_protect
+    ):
+        # 平日除外時間の判定が正しいことをテストする
+        expected_flag = True
+        target_datetime = datetime(
+            2024, 10, 8
+        )  # UTC 10/8 0:00 火曜日 は JST 10/7 火曜日 09:00
+        actual_flag = position_protect.is_within_business_hours_of_oanda(
+            target_datetime
+        )
+        assert expected_flag == actual_flag
+
+        # 午前 6 時 59 分から午前 7 時 5 分
+        expected_flag = False
+        target_datetime = datetime(
+            2024, 10, 7, 21, 59
+        )  # UTC 10/7 21:59 月曜日 は JST 10/8 火曜日 06:59
+        actual_flag = position_protect.is_within_business_hours_of_oanda(
+            target_datetime
+        )
+        assert expected_flag == actual_flag
+        expected_flag = False
+        target_datetime = datetime(
+            2024, 10, 7, 22, 5
+        )  # UTC 10/7 22:05 月曜日 は JST 10/8 火曜日 07:05
+        actual_flag = position_protect.is_within_business_hours_of_oanda(
+            target_datetime
+        )
+        assert expected_flag == actual_flag
+
+        # 午前 5 時 59 分から午前 6 時 5 分
+        expected_flag = False
+        target_datetime = datetime(
+            2024, 10, 7, 20, 59
+        )  # UTC 10/7 20:59 月曜日 は JST 10/8 火曜日 05:59
+        actual_flag = position_protect.is_within_business_hours_of_oanda(
+            target_datetime
+        )
+        assert expected_flag == actual_flag
+        expected_flag = False
+        target_datetime = datetime(
+            2024, 10, 7, 21, 5
+        )  # UTC 10/7 21:05 月曜日 は JST 10/8 火曜日 06:05
+        actual_flag = position_protect.is_within_business_hours_of_oanda(
+            target_datetime
+        )
+        assert expected_flag == actual_flag
