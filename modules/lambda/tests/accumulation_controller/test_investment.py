@@ -1,4 +1,3 @@
-# import logging
 import os
 import sys
 from unittest.mock import patch, MagicMock, call
@@ -11,10 +10,6 @@ path_ = os.path.abspath(
 )
 sys.path.insert(0, path_)
 
-# logging.basicConfig(level=logging.INFO)
-# logger = logging.getLogger(__name__)
-# logger.info("Starting test_oanda...")
-
 os.environ["OANDA_ACCOUNT_ID"] = "test"
 os.environ["OANDA_RESTAPI_TOKEN"] = "test"
 os.environ["OANDA_API_URL"] = "test"
@@ -26,31 +21,42 @@ from accumulation_controller.resources.lambda_function import (
     OANDA,
 )
 
-OANDA._create_client = MagicMock()
-oanda = OANDA(
-    account_id="test",
-    api_key="test",
-    api_url="test",
-    account_mode="test",
-)
 
-platform = oanda
-investment = Investment(platform, 3)
-# OANDA の規定レバレッジを設定
-investment.platform.leverages = {"USD_JPY": 0.022, "USD_MXN": 0.05, "TRY_JPY": 0.25}
-investment.platform.account.get_margin_available = MagicMock()
-investment.platform.account.get_margin_available.return_value = 1230195
-investment.platform.account.get_margin_used = MagicMock()
-investment.platform.account.get_margin_used.return_value = 3951594
-investment.platform.account.get_net_asset_value = MagicMock()
-investment.platform.account.get_net_asset_value.return_value = 5181699
+@pytest.fixture
+def investment():
+    OANDA._create_client = MagicMock()
+    oanda = OANDA(
+        account_id="test",
+        api_key="test",
+        api_url="test",
+        account_mode="test",
+    )
 
-accumulation = Accumulation(platform, 3)
+    investment = Investment(oanda, 3)
+    # OANDA の規定レバレッジを設定
+    investment.platform.leverages = {"USD_JPY": 0.022, "USD_MXN": 0.05, "TRY_JPY": 0.25}
+
+    return investment
+
+
+@pytest.fixture
+def accumulation():
+    OANDA._create_client = MagicMock()
+    oanda = OANDA(
+        account_id="test",
+        api_key="test",
+        api_url="test",
+        account_mode="test",
+    )
+
+    accumulation = Accumulation(oanda, 3)
+
+    return accumulation
 
 
 class TestInvestment:
 
-    def test_calcurate_usdjpy_amount_return_collect_value(self):
+    def test_calcurate_usdjpy_amount_return_collect_value(self, investment):
         # 正しい値が返っていることをテストする
         price_map = {"USD_JPY": OANDA.Price.Prices(90, 100, 95)}  # bid,ask,mid
         # USD_JPY: 100円の時に 150000円分買うとレバレッジが適用され 3倍であれば 4500枚
@@ -59,7 +65,7 @@ class TestInvestment:
         actual_usd_amount = investment.calcurate_usdjpy_amount(jpy_amount, price_map)
         assert expected_usd_amount == actual_usd_amount
 
-    def test_calcurate_tryjpy_amount_return_collect_value(self):
+    def test_calcurate_tryjpy_amount_return_collect_value(self, investment):
         # 正しい値が返っていることをテストする
         # 150000円分買うとレバレッジ分割られて 3倍であれば 50000枚
         jpy_amount = 150000
@@ -67,7 +73,7 @@ class TestInvestment:
         actual_try_amount = investment.calcurate_tryjpy_amount(jpy_amount)
         assert expected_try_amount == actual_try_amount
 
-    def test_calculate_required_margin_return_collect_value(self):
+    def test_calculate_required_margin_return_collect_value(self, investment):
         # 正しい値が返っていることをテストする
 
         # USD_JPY: 100円 であれば、USD を 10000枚買うには 22,000円必要
@@ -90,10 +96,26 @@ class TestInvestment:
         )
         assert expected_required_margin == actual_required_margin
 
-    def test_verify_purchase_requirements_just_value_is_true(self):
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.get_margin_available"
+    )
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.get_margin_used"
+    )
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.get_net_asset_value"
+    )
+    def test_verify_purchase_requirements_just_value_is_true(
+        self,
+        mock_get_net_asset_value,
+        mock_get_margin_used,
+        mock_get_margin_available,
+        investment,
+    ):
         # 証拠金がピッタリの時には True が返ることをテストする
-        investment.platform.account.get_margin_available = MagicMock()
-        investment.platform.account.get_margin_available.return_value = 22000
+        mock_get_margin_available.return_value = 22000
+        mock_get_margin_used.return_value = 100000
+        mock_get_net_asset_value.return_value = 1000000
 
         expected_flag = True
         currency_pair_amounts = {"USD_JPY": 10000}
@@ -105,10 +127,26 @@ class TestInvestment:
         assert expected_flag == actual_flag
         investment.platform.account.get_margin_available.return_value = 1000000
 
-    def test_verify_purchase_requirements_not_availeble_margin(self):
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.get_margin_available"
+    )
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.get_margin_used"
+    )
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.get_net_asset_value"
+    )
+    def test_verify_purchase_requirements_not_availeble_margin(
+        self,
+        mock_get_net_asset_value,
+        mock_get_margin_used,
+        mock_get_margin_available,
+        investment,
+    ):
         # 証拠金不足の時に False が返ることをテストする
-        investment.platform.account.get_margin_available = MagicMock()
-        investment.platform.account.get_margin_available.return_value = 1000
+        mock_get_margin_available.return_value = 1000
+        mock_get_margin_used.return_value = 100000
+        mock_get_net_asset_value.return_value = 1000000
 
         expected_flag = False
         currency_pair_amounts = {"USD_JPY": 10000}
@@ -120,8 +158,27 @@ class TestInvestment:
         assert expected_flag == actual_flag
         investment.platform.account.get_margin_available.return_value = 1000000
 
-    def test_verify_purchase_requirements_collect_flag(self):
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.get_margin_available"
+    )
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.get_margin_used"
+    )
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.get_net_asset_value"
+    )
+    def test_verify_purchase_requirements_collect_flag(
+        self,
+        mock_get_net_asset_value,
+        mock_get_margin_used,
+        mock_get_margin_available,
+        investment,
+    ):
         # ダミーのように十分な条件の時には True が返ることをテストする
+        mock_get_margin_available.return_value = 100000
+        mock_get_margin_used.return_value = 100000
+        mock_get_net_asset_value.return_value = 1000000
+
         expected_flag = True
         currency_pair_amounts = {"USD_JPY": 10000}
         price_map = {"USD_JPY": OANDA.Price.Prices(90, 100, 95)}  # bid,ask,mid
@@ -130,12 +187,26 @@ class TestInvestment:
         )
         assert expected_flag == actual_flag
 
-    def test_verify_purchase_requirements_not_nav(self):
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.get_margin_available"
+    )
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.get_margin_used"
+    )
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.get_net_asset_value"
+    )
+    def test_verify_purchase_requirements_not_nav(
+        self,
+        mock_get_net_asset_value,
+        mock_get_margin_used,
+        mock_get_margin_available,
+        investment,
+    ):
         # 有効残高 / 維持証拠金 が 110% 以下の場合は False が返ることをテストする
-        investment.platform.account.get_margin_used = MagicMock()
-        investment.platform.account.get_margin_used.return_value = 2000000
-        investment.platform.account.get_net_asset_value = MagicMock()
-        investment.platform.account.get_net_asset_value.return_value = 2100000
+        mock_get_margin_available.return_value = 1000000
+        mock_get_margin_used.return_value = 2000000
+        mock_get_net_asset_value.return_value = 2100000
         expected_flag = False
         currency_pair_amounts = {"USD_JPY": 10000}
         price_map = {"USD_JPY": OANDA.Price.Prices(90, 100, 95)}  # bid,ask,mid
@@ -146,12 +217,26 @@ class TestInvestment:
         investment.platform.account.get_margin_used.return_value = 500000
         investment.platform.account.get_net_asset_value.return_value = 3000000
 
-    def test_verify_purchase_requirements_division_zero_is_true(self):
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.get_margin_available"
+    )
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.get_margin_used"
+    )
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.get_net_asset_value"
+    )
+    def test_verify_purchase_requirements_division_zero_is_true(
+        self,
+        mock_get_net_asset_value,
+        mock_get_margin_used,
+        mock_get_margin_available,
+        investment,
+    ):
         # 維持証拠金 が 0円の場合は回避し True が返ることをテストする
-        investment.platform.account.get_margin_used = MagicMock()
-        investment.platform.account.get_margin_used.return_value = 0
-        investment.platform.account.get_net_asset_value = MagicMock()
-        investment.platform.account.get_net_asset_value.return_value = 2100000
+        mock_get_margin_available.return_value = 1000000
+        mock_get_margin_used.return_value = 0
+        mock_get_net_asset_value.return_value = 2100000
         expected_flag = True
         currency_pair_amounts = {"USD_JPY": 10000}
         price_map = {"USD_JPY": OANDA.Price.Prices(90, 100, 95)}  # bid,ask,mid
@@ -162,7 +247,7 @@ class TestInvestment:
         investment.platform.account.get_margin_used.return_value = 500000
         investment.platform.account.get_net_asset_value.return_value = 3000000
 
-    def test_count_weekdays_in_month(self):
+    def test_count_weekdays_in_month(self, investment):
         # 正しい値が返っているかをテストする
         # 2024/09 は平日が 21日
         expected_weekday_count = 21
@@ -176,20 +261,35 @@ class TestInvestment:
 
 class TestAccumulation:
 
-    def test_execute_purchase_take_collect_args(self):
+    @patch(
+        "accumulation_controller.resources.lambda_function.Accumulation.verify_purchase_requirements"
+    )
+    @patch(
+        "accumulation_controller.resources.lambda_function.Accumulation.calcurate_usdjpy_amount"
+    )
+    @patch(
+        "accumulation_controller.resources.lambda_function.Accumulation.calcurate_tryjpy_amount"
+    )
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Trade.request_place_order"
+    )
+    def test_execute_purchase_take_collect_args(
+        self,
+        mock_request_place_order,
+        mock_calcurate_tryjpy_amount,
+        mock_calcurate_usdjpy_amount,
+        mock_verify_purchase_requirements,
+        accumulation,
+    ):
         # place_order が正しい値を受け取っていることをテストする
-        accumulation.verify_purchase_requirements = MagicMock()
-        accumulation.verify_purchase_requirements.return_value = True
-        accumulation.calcurate_usdjpy_amount = MagicMock()
-        accumulation.calcurate_usdjpy_amount.return_value = 100
-        accumulation.calcurate_tryjpy_amount = MagicMock()
-        accumulation.calcurate_tryjpy_amount.return_value = 300
-        accumulation.platform.trade.request_place_order = MagicMock()
+        mock_verify_purchase_requirements.return_value = True
+        mock_calcurate_usdjpy_amount.return_value = 100
+        mock_calcurate_tryjpy_amount.return_value = 300
 
         accumulation.execute_purchase(100)
 
         # 注）2回目だけ Short なので - が入っているかを検証
-        accumulation.platform.trade.request_place_order.assert_has_calls(
+        mock_request_place_order.assert_has_calls(
             [
                 call(
                     {
@@ -235,3 +335,7 @@ class TestAccumulation:
         expected_daily_amount = 10000
         actual_daily_amount = Accumulation.get_daily_amount(monthly_amount, target_date)
         assert expected_daily_amount == actual_daily_amount
+
+    def test_is_additional_purchase_day(self, accumulation):
+        # 追加購入日の判定が正しいことを確認する
+        pass

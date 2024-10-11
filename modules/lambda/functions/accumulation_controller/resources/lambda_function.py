@@ -6,12 +6,13 @@ from oandapyV20.endpoints import (
     accounts,
     pricing,
     transactions,
+    trades,
 )
-from oandapyV20.endpoints.transactions import TransactionIDRange
 from typing import NamedTuple, Dict, List, Tuple
 from datetime import datetime, timedelta, date
 import logging
 import traceback
+import re
 
 
 # OANDAのAPI設定
@@ -103,11 +104,75 @@ class OANDA:
         def __init__(self, oanda) -> None:
             self.oanda = oanda
 
+        def request_trade_list(self):
+            """トレード一覧を送信する関数
+
+            Args:
+                order_data (dict): self._make_place_order_data()
+            Returns:
+                (dict): トレード一覧 ※おそらく state: CLOSE 分も含む
+                {
+                    "trades": [
+                        {
+                            "id": "210",
+                            "instrument": "TRY_JPY",
+                            "price": "4.352",
+                            "openTime": "2024-10-08T00:30:24.527704550Z",
+                            "initialUnits": "18",
+                            "initialMarginRequired": "7.7616",
+                            "state": "OPEN",
+                            "currentUnits": "18",
+                            "realizedPL": "0.0000",
+                            "financing": "0.0000",
+                            "dividendAdjustment": "0.0000",
+                            "unrealizedPL": "-1.4760",
+                            "marginUsed": "7.7580",
+                        },
+                        ...
+                    ],
+                    'lastTransactionID': '210'
+                }
+            """
+            r = trades.TradesList(accountID=self.oanda.account_id)
+            response = self.oanda.client.request(r)
+            return response
+
+        def request_open_trades(self):
+            """オープントレード一覧を送信する関数
+
+            Returns:
+                (dict): オープントレード一覧
+                {
+                    "trades": [
+                        {
+                            "id": "210",
+                            "instrument": "TRY_JPY",
+                            "price": "4.352",
+                            "openTime": "2024-10-08T00:30:24.527704550Z",
+                            "initialUnits": "18",
+                            "initialMarginRequired": "7.7616",
+                            "state": "OPEN",
+                            "currentUnits": "18",
+                            "realizedPL": "0.0000",
+                            "financing": "0.0000",
+                            "dividendAdjustment": "0.0000",
+                            "unrealizedPL": "-1.4760",
+                            "marginUsed": "7.7580",
+                        },
+                        ...
+                    ],
+                    'lastTransactionID': '210'
+                }
+            """
+            r = trades.OpenTrades(accountID=self.oanda.account_id)
+            response = self.oanda.client.request(r)
+            return response
+
         def request_place_order(self, order_data: dict):
             """マーケットオーダーを送信する関数
 
             Args:
-                order_data (dict): self._make_order_data()
+                order_data (dict): self._make_place_order_data()
             Returns:
                 _type_: _description_
             """
@@ -115,7 +180,7 @@ class OANDA:
             response = self.oanda.client.request(r)
             return response
 
-        def _make_order_data(
+        def _make_place_order_data(
             self,
             units: int,
             instrument: str = "USD_JPY",
@@ -131,7 +196,7 @@ class OANDA:
                 take_profit_pips (int, optional): 利確の pips 数. Defaults to 0.
 
             Returns:
-                dict: place_order データに沿った以下の形式
+                (dict): place_order データに沿った以下の形式
                 {
                     "order": {
                         "units": str(units),  # 正の値は買い、負の値は売り
@@ -153,6 +218,105 @@ class OANDA:
                 }
             }
             return order_data
+
+        def request_close_order(self, trade_id: str, close_data: dict):
+            """チケットのクローズオーダーを送信する関数
+
+            Args:
+                close_data (dict): self._make_close_data()
+            Returns:
+                (dict): クローズオーダー情報
+                {
+                    "orderCreateTransaction": {
+                        "id": "213",
+                        "accountID": "101-009-30020937-001",
+                        "userID": 30020937,
+                        "batchID": "213",
+                        "requestID": "61292424904719777",
+                        "time": "2024-10-08T01:29:27.901550405Z",
+                        "type": "MARKET_ORDER",
+                        "instrument": "TRY_JPY",
+                        "units": "-2",
+                        "timeInForce": "FOK",
+                        "positionFill": "REDUCE_ONLY",
+                        "reason": "TRADE_CLOSE",
+                        "tradeClose": {"units": "2", "tradeID": "210"},
+                    },
+                    "orderFillTransaction": {
+                        "id": "214",
+                        "accountID": "101-009-30020937-001",
+                        "userID": 30020937,
+                        "batchID": "213",
+                        "requestID": "61292424904719777",
+                        "time": "2024-10-08T01:29:27.901550405Z",
+                        "type": "ORDER_FILL",
+                        "orderID": "213",
+                        "instrument": "TRY_JPY",
+                        "units": "-2",
+                        "requestedUnits": "-2",
+                        "price": "4.272",
+                        "pl": "-0.1600",
+                        "quotePL": "-0.160",
+                        "financing": "0.0000",
+                        "baseFinancing": "0.00000000000000",
+                        "commission": "0.0000",
+                        "accountBalance": "3379876.1987",
+                        "gainQuoteHomeConversionFactor": "1",
+                        "lossQuoteHomeConversionFactor": "1",
+                        "guaranteedExecutionFee": "0.0000",
+                        "quoteGuaranteedExecutionFee": "0",
+                        "halfSpreadCost": "0.0800",
+                        "fullVWAP": "4.272",
+                        "reason": "MARKET_ORDER_TRADE_CLOSE",
+                        "tradeReduced": {
+                            "tradeID": "210",
+                            "units": "-2",
+                            "realizedPL": "-0.1600",
+                            "financing": "0.0000",
+                            "baseFinancing": "0.00000000000000",
+                            "price": "4.272",
+                            "guaranteedExecutionFee": "0.0000",
+                            "quoteGuaranteedExecutionFee": "0",
+                            "halfSpreadCost": "0.0800",
+                        },
+                        "fullPrice": {
+                            "closeoutBid": "4.272",
+                            "closeoutAsk": "4.352",
+                            "timestamp": "2024-10-08T01:29:05.488584473Z",
+                            "bids": [{"price": "4.272", "liquidity": "250000.0"}],
+                            "asks": [{"price": "4.352", "liquidity": "250000.0"}],
+                        },
+                        "homeConversionFactors": {
+                            "gainQuoteHome": {"factor": "1"},
+                            "lossQuoteHome": {"factor": "1"},
+                            "gainBaseHome": {"factor": "4.303376"},
+                            "lossBaseHome": {"factor": "4.320624"},
+                        },
+                    },
+                    "relatedTransactionIDs": ["213", "214"],
+                    "lastTransactionID": "214",
+                }
+            """
+            r = trades.TradeClose(
+                accountID=self.oanda.account_id, tradeID=trade_id, data=close_data
+            )
+            response = self.oanda.client.request(r)
+            return response
+
+        def _make_close_order_data(self, units: str = "ALL"):
+            """close_order に request するデータを生成し返す
+
+            Args:
+                units (str): ALL or 決済数量.
+
+            Returns:
+                (dict): close_order データに沿った以下の形式
+                {
+                    "units": "ALL" or 数量
+                }
+            """
+            close_order_data = {"units": units}
+            return close_order_data
 
         def request_close_all_positions(
             self,
@@ -305,11 +469,6 @@ class OANDA:
         PriceMap = Dict[str, Prices]
         price_map: PriceMap
         main_currency_pairs = ("USD_JPY", "USD_MXN", "TRY_JPY")
-        main_currencies = (
-            "USD",
-            "JPY",
-            "MXN",
-        )
 
         def __init__(self, oanda):
             self.oanda = oanda
@@ -317,19 +476,17 @@ class OANDA:
 
         def _generate_price_map(self):
             self.price_map = {}
-            logger.info("price_map を生成します")
             for currency_pair in self.main_currency_pairs:
                 prices = self.request_price(instruments=currency_pair)
                 self.price_map[currency_pair] = prices
-            logger.info(f"{self.price_map=}")
 
         def request_price(self, instruments: str):
             """価格取得関数
-                中値を計算し返す > bid, ask, mid を返す
+                bid, ask, mid(計算したもの) を返す
             Args:
                 instruments (str): 取得したい通過ペア. ex) USD_JPY
             Returns:
-                tuple: bid, ask, middle_price
+                (self.Prices): self.Prices(bid, ask, mid)
             """
             # 価格情報を取得するエンドポイントの設定
             params = {"instruments": instruments}
@@ -458,6 +615,10 @@ class OANDA:
             }
             """
             return response["account"]
+
+        def update_account_summary(self):
+            """決済後にアカウント情報を更新し再セットするための関数"""
+            self.account_summary = self._request_account_summary()
 
         def get_margin_available(self):
             """利用可能証拠金を取得する関数
@@ -642,7 +803,7 @@ class OANDA:
             Returns:
                 (float): swap 額
             """
-            financing = details_data.get("transaction", {}).get("financing", 0)
+            financing = details_data["financing"]
             return float(financing)
 
         def get_swap_points(self):
@@ -664,47 +825,6 @@ class OANDA:
                 Instrument: USD_MXN, Long Swap: 0.0000, Short Swap: 409.4515
                 Instrument: USD_JPY, Long Swap: 434.2470, Short Swap: 0.0000
                 """
-
-        def get_transactions_last_month(self):
-            # 先月の開始日と終了日を計算
-            now = datetime.now()
-            last_month_end = now.replace(day=1) - timedelta(days=1)
-            last_month_start = last_month_end.replace(day=1)
-
-            # 先月の取引を取得
-            # params = {
-            #     "from": last_month_start.isoformat() + "Z",
-            #     "to": last_month_end.isoformat() + "Z",
-            # }
-            # 先月の開始日と終了日を 'YYYY-MM-DD' 形式に変換
-            last_month_start_str = last_month_start.strftime("%Y-%m-%d")
-            last_month_end_str = last_month_end.strftime("%Y-%m-%d")
-
-            # 取引履歴を取得
-            params = {
-                "type": "ORDER_FILL",
-                "from": last_month_start_str,
-                "to": last_month_end_str,
-            }
-
-            r = transactions.TransactionList(
-                accountID=self.oanda.account_id, params=params
-            )
-            response = self.oanda.client.request(r)
-            logger.info(params)
-            logger.info(f"{response=}")
-            exit()
-            # transactions = TransactionIDRange(accountID=self.oanda.account_id, params=params)
-            # response = self.oanda.client.request(transactions)
-
-            # ポジションに関連する取引を抽出
-            for transaction in response["transactions"]:
-                if transaction["type"] in [
-                    "ORDER_FILL",
-                    "TRADE_OPEN",
-                    "TRADE_CLOSE",
-                ]:
-                    logger.info(transaction)
 
 
 class Investment:
@@ -903,7 +1023,7 @@ class Accumulation(Investment):
         if self.verify_purchase_requirements(currency_pair_amounts, price_map):
             # USD_JPY の Long
             # TODO: stoploss の設定
-            usd_order_data = self.platform.trade._make_order_data(
+            usd_order_data = self.platform.trade._make_place_order_data(
                 units=usd_amount, instrument="USD_JPY"
             )
             self.platform.trade.request_place_order(usd_order_data)
@@ -911,14 +1031,14 @@ class Accumulation(Investment):
             # USD_MXN の Short
             # TODO: stoploss の設定
             mxn_amount = -1 * mxn_amount  # Short のため - 数量にする
-            mxn_order_data = self.platform.trade._make_order_data(
+            mxn_order_data = self.platform.trade._make_place_order_data(
                 units=mxn_amount, instrument="USD_MXN"
             )
             self.platform.trade.request_place_order(mxn_order_data)
             logger.info(f"USD_MXN を {mxn_amount} 枚発注しました")
             # TRY_JPY の Long
             # TODO: stoploss の設定
-            try_order_data = self.platform.trade._make_order_data(
+            try_order_data = self.platform.trade._make_place_order_data(
                 units=try_amount, instrument="TRY_JPY"
             )
             self.platform.trade.request_place_order(try_order_data)
