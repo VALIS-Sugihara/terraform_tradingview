@@ -32,21 +32,32 @@ except Exception:
     raise Exception("ACCOUNT_MODE が設定されていません")
 
 
-logger = logging.getLogger(__name__)
-# ロガーのログレベルを設定する
-logger.setLevel(logging.INFO)
+def setup_logger(name):
+    logger = logging.getLogger(name)
+    # ロガーのログレベルを設定する
+    logger.setLevel(logging.INFO)
+    # Lambda ロガーでは ルートロガー がデフォルト出力をするため伝播を抑制する
+    logger.propagate = False
 
-# フォーマットの設定  [INFO] 2024-10-04 01:51:05,787 : <PERS> : test
-formatter = logging.Formatter(
-    f"[%(levelname)s] %(asctime)s : <{ACCOUNT_MODE}> : %(message)s"
-)
+    # フォーマットの設定  [INFO] 2024-10-04 01:51:05,787 : <PERS> : test
+    formatter = logging.Formatter(
+        f"[%(levelname)s] %(asctime)s : <{ACCOUNT_MODE}> : %(message)s"
+    )
 
-# ハンドラーの設定
-handler = logging.StreamHandler()  # Lambda の標準出力にログを出力
-handler.setFormatter(formatter)  # ハンドラーにフォーマッターを適用
+    # Clear existing handlers to avoid duplicate logging
+    if logger.hasHandlers():
+        logger.handlers.clear()
 
-# ロガーにハンドラーを追加
-logger.handlers = [handler]  # 既存のハンドラーを上書きするため、リストで設定
+    # ハンドラーの設定
+    handler = logging.StreamHandler()  # Lambda の標準出力にログを出力
+    handler.setFormatter(formatter)  # ハンドラーにフォーマッターを適用
+    # ロガーにハンドラーを追加
+    logger.addHandler(handler)
+
+    return logger
+
+
+logger = setup_logger(__name__)
 
 
 class OANDA:
