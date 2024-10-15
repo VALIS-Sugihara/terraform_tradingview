@@ -1,4 +1,3 @@
-# import logging
 import os
 import sys
 from unittest.mock import patch, MagicMock
@@ -10,10 +9,6 @@ path_ = os.path.abspath(
 )
 sys.path.insert(0, path_)
 
-# logging.basicConfig(level=logging.INFO)
-# logger = logging.getLogger(__name__)
-# logger.info("Starting test_oanda...")
-
 os.environ["OANDA_ACCOUNT_ID"] = "test"
 os.environ["OANDA_RESTAPI_TOKEN"] = "test"
 os.environ["OANDA_API_URL"] = "test"
@@ -21,13 +16,18 @@ os.environ["ACCOUNT_MODE"] = "test"
 
 from compound_investment_controller.resources.lambda_function import OANDA
 
-OANDA._create_client = MagicMock()
-oanda = OANDA(
-    account_id=os.environ["OANDA_ACCOUNT_ID"],
-    api_key=os.environ["OANDA_RESTAPI_TOKEN"],
-    api_url=os.environ["OANDA_API_URL"],
-    account_mode=os.environ["ACCOUNT_MODE"],
-)
+
+@pytest.fixture
+def oanda():
+    OANDA._create_client = MagicMock()
+    oanda = OANDA(
+        account_id=os.environ["OANDA_ACCOUNT_ID"],
+        api_key=os.environ["OANDA_RESTAPI_TOKEN"],
+        api_url=os.environ["OANDA_API_URL"],
+        account_mode=os.environ["ACCOUNT_MODE"],
+    )
+
+    return oanda
 
 
 class TestTrade:
@@ -35,7 +35,7 @@ class TestTrade:
     @patch(
         "compound_investment_controller.resources.lambda_function.orders.OrderCreate"
     )
-    def test_request_place_order_take_collect_args(self, mock_order_create):
+    def test_request_place_order_take_collect_args(self, mock_order_create, oanda):
         # orders.OrderCreate が正しい引数を受けているかテストする
         expected_order_data = {
             "order": {
@@ -55,7 +55,7 @@ class TestTrade:
             oanda.account_id, data=expected_order_data
         )
 
-    def test__make_order_data_return_collect_data(self):
+    def test__make_place_order_data_return_collect_data(self, oanda):
         # order_data が正しい形で生成されているかテストする
         arg_data = {
             "units": "100",  # 正の値は買い、負の値は売り
@@ -74,13 +74,15 @@ class TestTrade:
                 "positionFill": "DEFAULT",
             }
         }
-        actual_order_data = oanda.trade._make_order_data(**arg_data)
+        actual_order_data = oanda.trade._make_place_order_data(**arg_data)
         assert actual_order_data == expected_order_data
 
     @patch(
         "compound_investment_controller.resources.lambda_function.positions.PositionClose"
     )
-    def test_request_close_all_positions_take_collect_args(self, mock_position_close):
+    def test_request_close_all_positions_take_collect_args(
+        self, mock_position_close, oanda
+    ):
         # positions.PositionClose が正しい引数を受けているかテストする
         expected_data = {
             "accountID": oanda.account_id,
@@ -90,13 +92,13 @@ class TestTrade:
         oanda.trade.request_close_all_positions({"longUnits": "ALL"}, "USD_JPY")
         mock_position_close.assert_called_once_with(**expected_data)
 
-    def test__make_all_positions_data_return_collect_data(self):
+    def test__make_all_positions_data_return_collect_data(self, oanda):
         # all_positions_data が正しい形で生成されているかテストする
         expected_all_positions_data = {"longUnits": "ALL"}
         actual_all_positions_data = oanda.trade._make_all_positions_data("long")
         assert actual_all_positions_data == expected_all_positions_data
 
-    def test__make_all_positions_data_exception(self):
+    def test__make_all_positions_data_exception(self, oanda):
         # long or short 以外の引数に対して例外が送出されることを確認する
         with pytest.raises(Exception) as exc_info:
             oanda.trade._make_all_positions_data("wrongparam")
@@ -104,18 +106,60 @@ class TestTrade:
         # 例外メッセージが正しいかを確認
         assert str(exc_info.value) == "Error: close action 'wrongparam' is wrong"
 
-    def test_request_position_close(self):
+    def test_request_position_close(self, oanda):
         # positions.PositionClose が正しい引数を受けているかテストする
         pass
 
-    def test__make_position_data(self):
+    def test__make_position_data(self, oanda):
         # position_data が正しい形で生成されているかテストする
         pass
+
+    @patch("compound_investment_controller.resources.lambda_function.trades.TradesList")
+    def test_request_trade_list_take_collect_args(self, mock_trade_list, oanda):
+        # trades.TradesList が正しい引数を受けているかテストする
+        expected_data = {
+            "accountID": oanda.account_id,
+        }
+        oanda.trade.request_trade_list()
+        mock_trade_list.assert_called_once_with(**expected_data)
+
+    @patch("compound_investment_controller.resources.lambda_function.trades.OpenTrades")
+    def test_request_open_trades_take_collect_args(self, mock_open_trades, oanda):
+        # trades.OpenTrades が正しい引数を受けているかテストする
+        expected_data = {
+            "accountID": oanda.account_id,
+        }
+        oanda.trade.request_open_trades()
+        mock_open_trades.assert_called_once_with(**expected_data)
+
+    @patch("compound_investment_controller.resources.lambda_function.trades.TradeClose")
+    def test_request_close_order_take_collect_args(self, mock_close_order, oanda):
+        # trades.TradeClose が正しい引数を受けているかテストする
+        expected_data = {
+            "accountID": oanda.account_id,
+            "tradeID": "100",
+            "data": {"units": "50"},
+        }
+        args = {"trade_id": "100", "close_data": {"units": "50"}}
+        oanda.trade.request_close_order(**args)
+        mock_close_order.assert_called_once_with(**expected_data)
+
+    def test__make_close_order_data_return_collect_default_data(self, oanda):
+        # close_order_data が正しくデフォルトの形で生成されているかテストする
+        expected_close_order_data = {"units": "ALL"}
+        actual_close_order_data = oanda.trade._make_close_order_data()
+        assert actual_close_order_data == expected_close_order_data
+
+    def test__make_close_order_data_return_collect_specific_data(self, oanda):
+        # close_order_data が正しく指定の形で生成されているかテストする
+        expected_close_order_data = {"units": "123"}
+        actual_close_order_data = oanda.trade._make_close_order_data("123")
+        assert actual_close_order_data == expected_close_order_data
 
 
 class TestPrice:
 
-    def test__generate_price_map(self):
+    def test__generate_price_map(self, oanda):
         expected_data = {
             "USD_JPY": (1, 2, 3),
             "USD_MXN": (4, 5, 6),
@@ -133,7 +177,7 @@ class TestPrice:
     @patch(
         "compound_investment_controller.resources.lambda_function.pricing.PricingInfo"
     )
-    def test_request_price_take_collect_args(self, mock_pricing_info):
+    def test_request_price_take_collect_args(self, mock_pricing_info, oanda):
         # 正しい引数を受け取っているかをテストする
         expected_data = {
             "accountID": oanda.account_id,
@@ -142,7 +186,7 @@ class TestPrice:
         oanda.price.request_price("USD_JPY")
         mock_pricing_info.assert_called_once_with(**expected_data)
 
-    def test_request_price_returns_collect_values(self):
+    def test_request_price_returns_collect_values(self, oanda):
         # 返す値が正しいかをテストする
         oanda.client.request.return_value = {
             "prices": [{"bids": [{"price": "100.000"}], "asks": [{"price": "200.000"}]}]
@@ -155,7 +199,7 @@ class TestPrice:
 
         oanda.client.request = MagicMock()
 
-    def test_request_price_returns_PriceMap(self):
+    def test_request_price_returns_PriceMap(self, oanda):
         # 返す型が正しいかをテストする
         oanda.client.request.return_value = {
             "prices": [{"bids": [{"price": "100.000"}], "asks": [{"price": "200.000"}]}]
@@ -173,24 +217,19 @@ class TestAccount:
     @patch(
         "compound_investment_controller.resources.lambda_function.accounts.AccountSummary"
     )
-    def test__request_account_summary_take_collect_args(self, mock_account_summary):
+    def test__request_account_summary_take_collect_args(
+        self, mock_account_summary, oanda
+    ):
         # 正しい引数を受け取っているかをテストする
         expected_data = oanda.account_id
         oanda.account._request_account_summary()
         mock_account_summary.assert_called_once_with(expected_data)
 
-    # @patch("compound_investment_controller.resources.lambda_function.accounts.AccountSummary")
-    # def test_get_margin_available_take_collect_args(self, mock_account_summary):
-    #     # 正しい引数を受け取っているかをテストする
-    #     expected_data = oanda.account_id
-    #     oanda.account.get_margin_available()
-    #     mock_account_summary.assert_called_once_with(expected_data)
-
     @patch(
         "compound_investment_controller.resources.lambda_function.transactions.TransactionList"
     )
     def test_request_transaction_list_between_dates_take_collect_args(
-        self, mock_transaction_list
+        self, mock_transaction_list, oanda
     ):
         # 正しい引数を受け取っているかをテストする
         args = {
@@ -210,7 +249,7 @@ class TestAccount:
         oanda.account.request_transaction_list_between_dates(**args)
         mock_transaction_list.assert_called_once_with(**expected_data)
 
-    def test_get_transaction_id_by_list_return_collect_from_id(self):
+    def test_get_transaction_id_by_list_return_collect_from_id(self, oanda):
         # from の id が正しく返っていることをテストする
         expected_data = "111"
         list_data = {
@@ -225,7 +264,7 @@ class TestAccount:
         )
         assert expected_data == actual_data
 
-    def test_get_transaction_id_by_list_return_collect_to_id(self):
+    def test_get_transaction_id_by_list_return_collect_to_id(self, oanda):
         # to の id が正しく返っていることをテストする
         expected_data = "999"
         list_data = {
@@ -244,7 +283,7 @@ class TestAccount:
         "compound_investment_controller.resources.lambda_function.transactions.TransactionDetails"
     )
     def test_request_transaction_details_by_id_take_collect_args(
-        self, mock_transaction_details
+        self, mock_transaction_details, oanda
     ):
         # 正しい引数を受け取っているかをテストする
         args = {"id": 1}
@@ -256,7 +295,7 @@ class TestAccount:
         "compound_investment_controller.resources.lambda_function.transactions.TransactionIDRange"
     )
     def test_request_transaction_id_range_take_collect_args(
-        self, mock_transaction_id_range
+        self, mock_transaction_id_range, oanda
     ):
         # 正しい引数を受け取っているかをテストする
         args = {"from_id": 1, "to_id": 2, "transaction_type": "ORDER_FILL"}
@@ -272,7 +311,7 @@ class TestAccount:
         oanda.account.request_transaction_id_range(**args)
         mock_transaction_id_range.assert_called_once_with(**expected_data)
 
-    def test_get_financing_by_transaction_details_return_collect_value(self):
+    def test_get_financing_by_transaction_details_return_collect_value(self, oanda):
         # 正しい値を返しているかをテスト
         expected_value = 123456.789
         details_data = {
@@ -292,7 +331,7 @@ class TestAccount:
         )
         assert expected_value == actual_value
 
-    def test_get_financing_by_transaction_details_return_float(self):
+    def test_get_financing_by_transaction_details_return_float(self, oanda):
         # float を返しているかをテスト
         details_data = {
             "id": "121",
@@ -310,3 +349,16 @@ class TestAccount:
             details_data=details_data
         )
         assert isinstance(actual_value, float) is True
+
+    @patch(
+        "compound_investment_controller.resources.lambda_function.OANDA.Account._request_account_summary"
+    )
+    def test_update_account_summary_is_updated(
+        self, mock__request_account_summary, oanda
+    ):
+        # 口座情報が更新後のものになっているかテストする
+        oanda.account.account_summary = {"account_summary": "is not updated"}
+        expected_value = {"account_summary": "is updated"}
+        mock__request_account_summary.return_value = expected_value
+        oanda.account.update_account_summary()
+        assert expected_value == oanda.account.account_summary
