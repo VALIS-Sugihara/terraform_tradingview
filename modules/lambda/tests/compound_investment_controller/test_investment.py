@@ -354,6 +354,38 @@ class TestCompoundInvestment:
         actual_value = compound_investment.get_daily_swap_points()
         assert expected_value == actual_value
 
+    @patch(
+        "compound_investment_controller.resources.lambda_function.CompoundInvestment.make_between_dates_based_on_day"
+    )
+    def test_get_daily_swap_points_return_zero(
+        self, mock_make_between_dates_based_on_day, compound_investment
+    ):
+        # マイナススワップの際に 0 を返していることをテストする
+        mock_make_between_dates_based_on_day.return_value = (
+            "2111-01-01",
+            "2111-12-31",
+        )
+        compound_investment.platform.account.request_transaction_list_between_dates = (
+            MagicMock()
+        )
+        compound_investment.platform.account.get_transaction_id_by_list = MagicMock()
+        compound_investment.platform.account.request_transaction_id_range = MagicMock()
+        compound_investment.platform.account.request_transaction_id_range.return_value = {
+            "transactions": [{}, {}, {}]
+        }
+        compound_investment.platform.account.get_financing_by_transaction_details = (
+            MagicMock()
+        )
+        compound_investment.platform.account.get_financing_by_transaction_details.side_effect = [
+            -1.1,
+            -2.2,
+            -3.3,
+        ]
+
+        expected_value = 0
+        actual_value = compound_investment.get_daily_swap_points()
+        assert expected_value == actual_value
+
     def test_make_between_dates_based_on_day_return_collect_value_on_monday(self):
         # 月曜日指定で正しい from 日付, to 日付 を返していることをテストする
         target_datetime = datetime(2024, 9, 30)  # 2024/09/29 は日曜日

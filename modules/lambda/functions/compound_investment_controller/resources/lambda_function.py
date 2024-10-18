@@ -1044,6 +1044,9 @@ class CompoundInvestment(Investment):
             financing += self.platform.account.get_financing_by_transaction_details(
                 transaction_detail
             )
+        # マイナススワップの場合 0円として扱う（反対ポジションをオーダーしないため）
+        if financing < 0:
+            financing = 0
 
         return financing
 
