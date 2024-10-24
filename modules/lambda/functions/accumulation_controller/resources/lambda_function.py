@@ -9,10 +9,12 @@ from oandapyV20.endpoints import (
     trades,
 )
 from typing import NamedTuple, Dict, List, Tuple
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 import logging
 import traceback
 import re
+from time import sleep
+import math
 
 
 # OANDAのAPI設定
@@ -186,7 +188,74 @@ class OANDA:
             Args:
                 order_data (dict): self._make_place_order_data()
             Returns:
-                _type_: _description_
+                (dict): 以下の形式の トランザクションデータ
+                    {
+                        "orderCreateTransaction": {
+                            "id": "1354",
+                            "accountID": "101-009-30020937-001",
+                            "userID": 30020937,
+                            "batchID": "1354",
+                            "requestID": "61298263395970552",
+                            "time": "2024-10-24T04:09:32.747806106Z",
+                            "type": "MARKET_ORDER",
+                            "instrument": "USD_JPY",
+                            "units": "999",
+                            "timeInForce": "FOK",
+                            "positionFill": "DEFAULT",
+                            "reason": "CLIENT_ORDER",
+                        },
+                        "orderFillTransaction": {
+                            "id": "1355",
+                            "accountID": "101-009-30020937-001",
+                            "userID": 30020937,
+                            "batchID": "1354",
+                            "requestID": "61298263395970552",
+                            "time": "2024-10-24T04:09:32.747806106Z",
+                            "type": "ORDER_FILL",
+                            "orderID": "1354",
+                            "instrument": "USD_JPY",
+                            "units": "999",
+                            "requestedUnits": "999",
+                            "price": "152.299",
+                            "pl": "0.0000",
+                            "quotePL": "0",
+                            "financing": "0.0000",
+                            "baseFinancing": "0",
+                            "commission": "0.0000",
+                            "accountBalance": "3397307.8697",
+                            "gainQuoteHomeConversionFactor": "1",
+                            "lossQuoteHomeConversionFactor": "1",
+                            "guaranteedExecutionFee": "0.0000",
+                            "quoteGuaranteedExecutionFee": "0",
+                            "halfSpreadCost": "1.9980",
+                            "fullVWAP": "152.299",
+                            "reason": "MARKET_ORDER",
+                            "tradeOpened": {
+                                "price": "152.299",
+                                "tradeID": "1355",
+                                "units": "999",
+                                "guaranteedExecutionFee": "0.0000",
+                                "quoteGuaranteedExecutionFee": "0",
+                                "halfSpreadCost": "1.9980",
+                                "initialMarginRequired": "6085.7881",
+                            },
+                            "fullPrice": {
+                                "closeoutBid": "152.288",
+                                "closeoutAsk": "152.306",
+                                "timestamp": "2024-10-24T04:09:32.681626730Z",
+                                "bids": [{"price": "152.295", "liquidity": "250000"}],
+                                "asks": [{"price": "152.299", "liquidity": "250000"}],
+                            },
+                            "homeConversionFactors": {
+                                "gainQuoteHome": {"factor": "1"},
+                                "lossQuoteHome": {"factor": "1"},
+                                "gainBaseHome": {"factor": "151.992406"},
+                                "lossBaseHome": {"factor": "152.601594"},
+                            },
+                        },
+                        "relatedTransactionIDs": ["1354", "1355"],
+                        "lastTransactionID": "1355",
+                    }
             """
             r = orders.OrderCreate(self.oanda.account_id, data=order_data)
             response = self.oanda.client.request(r)
@@ -1072,6 +1141,58 @@ class Accumulation(Investment):
         daily_amount = round(monthly_amount / weekday_count)
         return daily_amount
 
+    @classmethod
+    def get_25th_or_previous_friday(cls, target_date_time: datetime = None):
+        """その月の 25日が土日の場合直前の金曜日の日付を返す関数
+            ※毎月 25日付近で関数を実行するための判定用
+
+        Args:
+            target_date_time (datetime, optional): 関数を実行することになる指定日. Defaults to None.
+
+        Returns:
+            (date): 25日もしくは直前の金曜日の日付
+        """
+        # JSTのタイムゾーンを定義
+        JST = timezone(timedelta(hours=9))
+        # 日付が指定されていない場合現在の日付を取得
+        today = datetime.now(JST) if target_date_time is None else target_date_time
+        # 現在の年と月を取得
+        year = today.year
+        month = today.month
+
+        # 今月の25日を取得
+        date_25th = datetime(year, month, 25, tzinfo=JST)
+
+        # 25日が土日でない場合はその日を返す
+        if date_25th.weekday() < 5:  # weekday()は0が月曜日、6が日曜日
+            return date_25th.date()
+
+        # 25日が土日である場合、直前の金曜日を返す
+        days_to_friday = date_25th.weekday() - 4  # 金曜日はweekday()で4
+        previous_friday = date_25th - timedelta(days=days_to_friday)
+
+        return previous_friday.date()
+
+    @classmethod
+    def is_25th_or_previous_friday_today(
+        cls, target_date: date = None, execution_date: date = None
+    ):
+        """実行日が 25日もしくは直前の金曜日の日付であるか否かの判定をする関数
+            ※毎月 25日付近で関数を実行するための判定用
+
+        Args:
+            target_date (date, optional): 関数を実行することになる指定日. Defaults to None.
+            execution_date (date, optional): 関数実行日（主にテスト用）. Defaults to None.
+
+        Returns:
+            (boolean): 実行日が 25日もしくは直前の金曜日の日付であるか否か
+        """
+        # 実行日が指定されていない場合現在の日付を取得
+        execution_date = date.today() if execution_date is None else execution_date
+
+        # 実行日が25日もしくは直前の金曜日かどうかを判定
+        return execution_date.day == target_date.day
+
     def __change_account_mode(self):
         """アカウントモードによる調整を行う
         DEMO: デモ環境, PERS: 個人本番環境, CORP: 法人本番環境
@@ -1114,13 +1235,20 @@ def lambda_handler(event, context):
     """[戦略] レバレッジ 5倍をキープするとして、2年間複利運用すると 2年目での最終的な unit数は 41units になる見込み
         目標金額が 240Myen だとすると 5853658yen/month=unit となる。
         毎月 80万円入金し、5853658yen=40370$ 分購入を続ける"""
-    # TODO: API 利用のための GOLD ステータス維持のため NY サーバでの取引量が 500,000$/月内 を超える必要がある
-    #   したがって、25,000$（* 5回）の USD を両建てでオーダーしその後決済するメンテナンス用コントローラを追加する必要がある
 
     try:
         logger.info("Starting execute_accumulation ...")
         execute_accumulation()
         logger.info("Success placing orders")
+
+        # 毎月平日 25日 or 直前の金曜日であれば月間購入額の調整を行う
+        if Accumulation.is_25th_or_previous_friday_today(
+            Accumulation.get_25th_or_previous_friday()
+        ):
+            logger.info("Starting keep_gold_status ...")
+            keep_gold_status()
+            logger.info("Success Keep GOLD Status")
+
         return {"statusCode": 200, "body": "Success placing orders"}
     except Exception as e:
         logger.error(str(e))
@@ -1146,6 +1274,58 @@ def execute_accumulation():
         return
     # 買付けの実施
     accumulation.execute_purchase(daily_amount)
+
+
+def keep_gold_status():
+    """GOLD ステータス維持のためには月内に 500,000ドル以上の取引が必要となるため
+    有効証拠金の 1/2 を USD_JPY でオーダーし即座に決済する
+    TODO: 必ずオーバーするため必要最低限の取引回数へ調整
+    """
+    # インスタンスの実体化
+    oanda = OANDA(
+        account_id=OANDA_ACCOUNT_ID,
+        api_key=OANDA_API_KEY,
+        api_url=OANDA_API_URL,
+        account_mode=ACCOUNT_MODE,
+    )
+
+    margin_available = (
+        oanda.account.get_margin_available() / 2
+    )  # 有効証拠金の 1/2 を利用するものとする
+    each_units = math.ceil(
+        margin_available
+        / oanda.leverages["USD_JPY"]
+        / oanda.price.price_map["USD_JPY"].mid
+    )
+
+    required_units = 500000
+    for i in range(0, required_units, each_units * 2):
+        # 発注 ※念の為両建てで行う
+        long_each_units = math.ceil(each_units / 2)
+        short_each_units = -1 * math.ceil((each_units / 2))
+        long_order_data = oanda.trade._make_place_order_data(
+            units=long_each_units, instrument="USD_JPY"
+        )
+        short_order_data = oanda.trade._make_place_order_data(
+            units=short_each_units, instrument="USD_JPY"
+        )
+        place_long_order_response = oanda.trade.request_place_order(long_order_data)
+        logger.info(f"USD_JPY を {long_each_units} 枚発注しました")
+        place_short_order_response = oanda.trade.request_place_order(short_order_data)
+        logger.info(f"USD_JPY を {short_each_units} 枚発注しました")
+        # 決済
+        trade_long_id = place_long_order_response["orderFillTransaction"]["id"]
+        trade_short_id = place_short_order_response["orderFillTransaction"]["id"]
+        close_order_data = oanda.trade._make_close_order_data(units="ALL")
+        oanda.trade.request_close_order(
+            trade_id=trade_long_id, close_data=close_order_data
+        )
+        logger.info(f"USD_JPY を {long_each_units} 枚決済しました")
+        oanda.trade.request_close_order(
+            trade_id=trade_short_id, close_data=close_order_data
+        )
+        logger.info(f"USD_JPY を {short_each_units} 枚決済しました")
+        sleep(5)  # 決済金額が反映されていない場合があるため数秒待つ
 
 
 # ローカルテスト

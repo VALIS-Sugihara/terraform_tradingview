@@ -2,7 +2,7 @@ import os
 import sys
 from unittest.mock import patch, MagicMock, call
 import pytest
-from datetime import date
+from datetime import date, datetime, timezone, timedelta
 
 # Add the directory (terraform_tradingview/modules/lambda/functions) to sys.path
 path_ = os.path.abspath(
@@ -339,3 +339,55 @@ class TestAccumulation:
     def test_is_additional_purchase_day(self, accumulation):
         # 追加購入日の判定が正しいことを確認する
         pass
+
+    def test_get_25th_or_previous_friday_return_25th(self):
+        # 25日が平日の月の場合、25日日付が返ることをテストする
+        JST = timezone(timedelta(hours=9))
+        target_date = datetime(2024, 10, 3, tzinfo=JST)  # 2024/10/25 は金曜日
+        excepted_value = date(2024, 10, 25)  # 2024/10/25 は金曜日
+        actual_value = Accumulation.get_25th_or_previous_friday(target_date)
+        assert excepted_value == actual_value
+
+    def test_get_25th_or_previous_friday_return_previous_friday(self):
+        # 25日が土日の月の場合、直前の金曜日の日付が返ることをテストする
+        JST = timezone(timedelta(hours=9))
+        target_date = datetime(2024, 8, 25, tzinfo=JST)  # 2024/08/25 は土曜日
+        excepted_value = date(2024, 8, 23)  # 2024/08/23 は金曜日
+        actual_value = Accumulation.get_25th_or_previous_friday(target_date)
+        assert excepted_value == actual_value
+
+    def test_is_25th_or_previous_friday_return_true(self):
+        # 25日が平日の月の場合、25日に実行すると True が返ることをテストする
+        target_date = date(2024, 10, 25)  # 2024/10/25 は金曜日
+        execution_date = date(2024, 10, 25)  # 2024/10/25 は金曜日
+        excepted_value = True
+        actual_value = Accumulation.is_25th_or_previous_friday_today(
+            target_date, execution_date
+        )
+        assert excepted_value == actual_value
+        # 25日が土日の月の場合、指定日に実行すると true が返ることをテストする
+        target_date = date(2024, 8, 23)  # 2024/8/23 は金曜日
+        execution_date = date(2024, 8, 23)  # 2024/8/23 は金曜日
+        excepted_value = True
+        actual_value = Accumulation.is_25th_or_previous_friday_today(
+            target_date, execution_date
+        )
+        assert excepted_value == actual_value
+
+    def test_is_25th_or_previous_friday_return_false(self):
+        # 25日が平日の月の場合、違う日に実行すると False が返ることをテストする
+        target_date = date(2024, 10, 25)  # 2024/10/25 は金曜日
+        execution_date = date(2024, 10, 24)  # 2024/10/24 は木曜日
+        excepted_value = False
+        actual_value = Accumulation.is_25th_or_previous_friday_today(
+            target_date, execution_date
+        )
+        assert excepted_value == actual_value
+        # 25日が土日の月の場合、25日に実行すると False が返ることをテストする
+        target_date = date(2024, 8, 23)  # 2024/8/23 は金曜日
+        execution_date = date(2024, 8, 25)  # 2024/8/25 は日曜日
+        excepted_value = False
+        actual_value = Accumulation.is_25th_or_previous_friday_today(
+            target_date, execution_date
+        )
+        assert excepted_value == actual_value
