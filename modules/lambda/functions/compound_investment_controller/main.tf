@@ -15,7 +15,7 @@ resource "aws_lambda_function" "this" {
   runtime          = var.runtime
   filename         = "${path.module}/lambda_function.zip"
   source_code_hash = filebase64sha256("${path.module}/lambda_function.zip")
-  timeout          = 30
+  timeout          = 120
 
   depends_on = [null_resource.create_lambda_zip]
 
