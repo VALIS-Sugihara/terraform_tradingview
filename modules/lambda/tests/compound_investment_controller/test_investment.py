@@ -11,14 +11,13 @@ path_ = os.path.abspath(
 )
 sys.path.insert(0, path_)
 
-# logging.basicConfig(level=logging.INFO)
-# logger = logging.getLogger(__name__)
-# logger.info("Starting test_oanda...")
-
-os.environ["OANDA_ACCOUNT_ID"] = "test"
-os.environ["OANDA_RESTAPI_TOKEN"] = "test"
-os.environ["OANDA_API_URL"] = "test"
+os.environ["SECRET_NAME"] = "test"
 os.environ["ACCOUNT_MODE"] = "test"
+_credentials = {
+    "OANDA_ACCOUNT_ID": "test",
+    "OANDA_RESTAPI_TOKEN": "test",
+    "OANDA_API_URL": "test",
+}
 
 from compound_investment_controller.resources.lambda_function import (
     Investment,
@@ -29,13 +28,9 @@ from compound_investment_controller.resources.lambda_function import (
 
 @pytest.fixture
 def investment():
+    OANDA._get_credentials = MagicMock().return_value(_credentials)
     OANDA._create_client = MagicMock()
-    oanda = OANDA(
-        account_id="test",
-        api_key="test",
-        api_url="test",
-        account_mode="test",
-    )
+    oanda = OANDA(account_mode="test")
     investment = Investment(oanda, 3)
     # OANDA の規定レバレッジを設定
     investment.platform.leverages = {"USD_JPY": 0.022, "USD_MXN": 0.05, "TRY_JPY": 0.25}
@@ -53,13 +48,9 @@ def investment():
 
 @pytest.fixture
 def compound_investment():
+    OANDA._get_credentials = MagicMock().return_value(_credentials)
     OANDA._create_client = MagicMock()
-    oanda = OANDA(
-        account_id="test",
-        api_key="test",
-        api_url="test",
-        account_mode="test",
-    )
+    oanda = OANDA(account_mode="test")
     compound_investment = CompoundInvestment(oanda, 3)
     return compound_investment
 

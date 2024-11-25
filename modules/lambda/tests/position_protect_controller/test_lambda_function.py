@@ -10,10 +10,13 @@ path_ = os.path.abspath(
 )
 sys.path.insert(0, path_)
 
-os.environ["OANDA_ACCOUNT_ID"] = "test"
-os.environ["OANDA_RESTAPI_TOKEN"] = "test"
-os.environ["OANDA_API_URL"] = "test"
+os.environ["SECRET_NAME"] = "test"
 os.environ["ACCOUNT_MODE"] = "test"
+_credentials = {
+    "OANDA_ACCOUNT_ID": "test",
+    "OANDA_RESTAPI_TOKEN": "test",
+    "OANDA_API_URL": "test",
+}
 
 from position_protect_controller.resources.lambda_function import (
     execute_position_protect,

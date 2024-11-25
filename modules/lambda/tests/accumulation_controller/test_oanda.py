@@ -9,23 +9,22 @@ path_ = os.path.abspath(
 )
 sys.path.insert(0, path_)
 
-os.environ["OANDA_ACCOUNT_ID"] = "test"
-os.environ["OANDA_RESTAPI_TOKEN"] = "test"
-os.environ["OANDA_API_URL"] = "test"
+os.environ["SECRET_NAME"] = "test"
 os.environ["ACCOUNT_MODE"] = "test"
+_credentials = {
+    "OANDA_ACCOUNT_ID": "test",
+    "OANDA_RESTAPI_TOKEN": "test",
+    "OANDA_API_URL": "test",
+}
 
 from accumulation_controller.resources.lambda_function import OANDA
 
 
 @pytest.fixture
 def oanda():
+    OANDA._get_credentials = MagicMock().return_value(_credentials)
     OANDA._create_client = MagicMock()
-    oanda = OANDA(
-        account_id=os.environ["OANDA_ACCOUNT_ID"],
-        api_key=os.environ["OANDA_RESTAPI_TOKEN"],
-        api_url=os.environ["OANDA_API_URL"],
-        account_mode=os.environ["ACCOUNT_MODE"],
-    )
+    oanda = OANDA(account_mode=os.environ["ACCOUNT_MODE"])
 
     return oanda
 

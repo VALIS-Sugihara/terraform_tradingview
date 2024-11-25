@@ -15,15 +15,16 @@ import traceback
 import re
 from time import sleep
 import math
+import boto3
+from botocore.exceptions import ClientError
+import json
 
-
-# OANDAのAPI設定
-OANDA_ACCOUNT_ID = os.environ["OANDA_ACCOUNT_ID"]
-OANDA_API_KEY = os.environ["OANDA_RESTAPI_TOKEN"]
-OANDA_API_URL = os.environ["OANDA_API_URL"]
 
 MONTHLY_AMOUNT = int(os.environ["MONTHLY_AMOUNT"])  # 月単位の設定積立額
 LEVERAGE = float(os.environ["LEVERAGE"])  # カスタム設定レバレッジ
+SECRET_NAME = os.environ["SECRET_NAME"]
+REGION_NAME = "us-east-1"
+_credentials = None  # 内部的に保持するための変数
 
 try:
     ACCOUNT_MODE = os.environ["ACCOUNT_MODE"]
@@ -59,6 +60,37 @@ def setup_logger(name):
 logger = setup_logger(__name__)
 
 
+def get_secret(secret_name: str):
+    """SecretsManager からシークレットを取得する関数
+
+    Args:
+        secret_name (str): シークレット名
+
+    Returns:
+        (dict): シークレット
+
+    Raises:
+        e: boto3.ClientError
+    """
+
+    # Create a Secrets Manager client
+    session = boto3.session.Session()
+    client = session.client(service_name="secretsmanager", region_name=REGION_NAME)
+
+    try:
+        get_secret_value_response = client.get_secret_value(SecretId=secret_name)
+    except ClientError as e:
+        # For a list of exceptions thrown, see
+        # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
+        logger.error(str(e))
+        logger.error(traceback.format_exc())
+        logger.error("シークレットを取得できませんでした")
+        raise e
+
+    secrets = get_secret_value_response["SecretString"]
+    return json.loads(secrets)
+
+
 class OANDA:
     """OANDA API を実行するためのクラス
 
@@ -73,18 +105,29 @@ class OANDA:
     client: oandapyV20.API  # API クライアント
     leverages: dict  # OANDA の規定レバレッジ
 
-    def __init__(
-        self, account_id: str, api_key: str, api_url: str, account_mode: str
-    ) -> None:
-        self.account_id = account_id
-        self.api_key = api_key
-        self.api_url = api_url
+    def __init__(self, account_mode: str) -> None:
+        credentials = self._get_credentials()
+        self.account_id = credentials["OANDA_ACCOUNT_ID"]
+        self.api_key = credentials["OANDA_RESTAPI_TOKEN"]
+        self.api_url = credentials["OANDA_API_URL"]
         self.account_mode = account_mode
         self.client = self._create_client()
         self.leverages = self._define_leverage()
         self.trade = self.Trade(self)  # trade_manager
         self.price = self.Price(self)  # price_manager
         self.account = self.Account(self)  # account_manager
+
+    def _get_credentials(self) -> None:
+        """クレデンシャルのキャッシュ状況を確認し、
+        保持していなければシークレットを取得し global 変数に保存、保持していればそのままとする
+
+        Returns:
+            dict: global _credentials
+        """
+        global _credentials
+        if _credentials is None:
+            _credentials = get_secret(SECRET_NAME)
+        return _credentials
 
     def _create_client(self):
         # Create and return an oandapyV20 API client instance using api_key and api_url
@@ -1259,12 +1302,7 @@ def lambda_handler(event, context):
 
 def execute_accumulation():
     # インスタンスの実体化
-    oanda = OANDA(
-        account_id=OANDA_ACCOUNT_ID,
-        api_key=OANDA_API_KEY,
-        api_url=OANDA_API_URL,
-        account_mode=ACCOUNT_MODE,
-    )
+    oanda = OANDA(account_mode=ACCOUNT_MODE)
     accumulation = Accumulation(platform=oanda, leverage=LEVERAGE)
     # 当日の投資額を計算
     daily_amount = accumulation.get_daily_amount(MONTHLY_AMOUNT)
@@ -1282,12 +1320,7 @@ def keep_gold_status():
     TODO: 必ずオーバーするため必要最低限の取引回数へ調整
     """
     # インスタンスの実体化
-    oanda = OANDA(
-        account_id=OANDA_ACCOUNT_ID,
-        api_key=OANDA_API_KEY,
-        api_url=OANDA_API_URL,
-        account_mode=ACCOUNT_MODE,
-    )
+    oanda = OANDA(account_mode=ACCOUNT_MODE)
 
     margin_available = (
         oanda.account.get_margin_available() / 2

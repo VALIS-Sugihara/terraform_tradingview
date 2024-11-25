@@ -1,19 +1,13 @@
 locals {
-  project_name             = "vls-trdvw"
-  ACCOUNT_MODE_DEMO        = "DEMO"                                                              # デモ環境であることを示す
-  ACCOUNT_MODE_PERS        = "PERS"                                                              # 個人用本番環境であることを示す
-  ACCOUNT_MODE_CORP        = "CORP"                                                              # 法人用本番環境であることを示す
-  PERS_OANDA_ACCOUNT_ID    = "001-009-12298567-001"                                              # for PERS
-  PERS_OANDA_RESTAPI_TOKEN = "8af54054da44f354d76fa4340dd8f935-dfa8a10745fb7349140f0b3b801e5803" # for PERS
-  PERS_OANDA_API_URL       = "https://api-fxtrade.oanda.com"                                     # デモアカウントの場合 "https://api-fxpractice.oanda.com"。ライブアカウントの場合は'https://api-fxtrade.oanda.com'
-  DEMO_OANDA_ACCOUNT_ID    = "101-009-30020937-001"                                              # for DEMO
-  DEMO_OANDA_RESTAPI_TOKEN = "6197f9b13865185a88321925cb9d0e44-f2cbf4f1305c54dcb0a16422f76fb69c" # for DEMO
-  DEMO_OANDA_API_URL       = "https://api-fxpractice.oanda.com"                                  # デモアカウントの場合 "https://api-fxpractice.oanda.com"。ライブアカウントの場合は'https://api-fxtrade.oanda.com'
-  CORP_OANDA_ACCOUNT_ID    = "001-009-12556146-001"                                              # for CORP
-  CORP_OANDA_RESTAPI_TOKEN = "fd523da41d1c7a81d4d545716ada49f5-a6b91f8e0e828b0a91f519870008438e" # for CORP
-  CORP_OANDA_API_URL       = "https://api-fxtrade.oanda.com"                                     # デモアカウントの場合 "https://api-fxpractice.oanda.com"。ライブアカウントの場合は'https://api-fxtrade.oanda.com'
-  INFO_FILTER_NAME         = "info_filter"
-  ERROR_FILTER_NAME        = "error_filter"
+  project_name           = "vls-trdvw"
+  ACCOUNT_MODE_DEMO      = "DEMO"                   # デモ環境であることを示す
+  ACCOUNT_MODE_PERS      = "PERS"                   # 個人用本番環境であることを示す
+  ACCOUNT_MODE_CORP      = "CORP"                   # 法人用本番環境であることを示す
+  PERS_OANDA_SECRET_NAME = "PERS_OANDA_CREDENTIALS" # for PERS シークレット名
+  DEMO_OANDA_SECRET_NAME = "DEMO_OANDA_CREDENTIALS" # for DEMO
+  CORP_OANDA_SECRET_NAME = "CORP_OANDA_CREDENTIALS" # for CORP
+  INFO_FILTER_NAME       = "info_filter"
+  ERROR_FILTER_NAME      = "error_filter"
 }
 
 ###
@@ -67,12 +61,10 @@ module "lambda_demo_accumulation_controller" {
   runtime                = "python3.12"
   role_arn               = aws_iam_role.lambda_exec.arn
   environment_variables = {
-    OANDA_RESTAPI_TOKEN = local.DEMO_OANDA_RESTAPI_TOKEN
-    OANDA_ACCOUNT_ID    = local.DEMO_OANDA_ACCOUNT_ID
-    OANDA_API_URL       = local.DEMO_OANDA_API_URL
-    ACCOUNT_MODE        = local.ACCOUNT_MODE_DEMO # デモ環境
-    MONTHLY_AMOUNT      = 800000
-    LEVERAGE            = 7.7
+    SECRET_NAME    = local.DEMO_OANDA_SECRET_NAME
+    ACCOUNT_MODE   = local.ACCOUNT_MODE_DEMO # デモ環境
+    MONTHLY_AMOUNT = 800000
+    LEVERAGE       = 7.7
   }
   log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn
   log_processor_lambda_name = aws_lambda_function.log_processor_lambda.function_name
@@ -90,12 +82,10 @@ module "lambda_pers_accumulation_controller" {
   runtime                = "python3.12"
   role_arn               = aws_iam_role.lambda_exec.arn
   environment_variables = {
-    OANDA_RESTAPI_TOKEN = local.PERS_OANDA_RESTAPI_TOKEN
-    OANDA_ACCOUNT_ID    = local.PERS_OANDA_ACCOUNT_ID
-    OANDA_API_URL       = local.PERS_OANDA_API_URL
-    ACCOUNT_MODE        = local.ACCOUNT_MODE_PERS # 個人環境
-    MONTHLY_AMOUNT      = 80000
-    LEVERAGE            = 3.0
+    SECRET_NAME    = local.PERS_OANDA_SECRET_NAME
+    ACCOUNT_MODE   = local.ACCOUNT_MODE_PERS # 個人環境
+    MONTHLY_AMOUNT = 80000
+    LEVERAGE       = 3.0
   }
   log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn
   log_processor_lambda_name = aws_lambda_function.log_processor_lambda.function_name
@@ -113,12 +103,10 @@ module "lambda_corp_accumulation_controller" {
   runtime                = "python3.12"
   role_arn               = aws_iam_role.lambda_exec.arn
   environment_variables = {
-    OANDA_RESTAPI_TOKEN = local.CORP_OANDA_RESTAPI_TOKEN
-    OANDA_ACCOUNT_ID    = local.CORP_OANDA_ACCOUNT_ID
-    OANDA_API_URL       = local.CORP_OANDA_API_URL
-    ACCOUNT_MODE        = local.ACCOUNT_MODE_CORP # 法人環境
-    MONTHLY_AMOUNT      = 800000
-    LEVERAGE            = 3.0
+    SECRET_NAME    = local.CORP_OANDA_SECRET_NAME
+    ACCOUNT_MODE   = local.ACCOUNT_MODE_CORP # 法人環境
+    MONTHLY_AMOUNT = 800000
+    LEVERAGE       = 3.0
   }
   log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn
   log_processor_lambda_name = aws_lambda_function.log_processor_lambda.function_name
@@ -136,11 +124,9 @@ module "lambda_demo_compound_investment_controller" {
   runtime                = "python3.12"
   role_arn               = aws_iam_role.lambda_exec.arn
   environment_variables = {
-    OANDA_RESTAPI_TOKEN = local.DEMO_OANDA_RESTAPI_TOKEN
-    OANDA_ACCOUNT_ID    = local.DEMO_OANDA_ACCOUNT_ID
-    OANDA_API_URL       = local.DEMO_OANDA_API_URL
-    ACCOUNT_MODE        = local.ACCOUNT_MODE_DEMO # デモ環境
-    LEVERAGE            = 7.7
+    SECRET_NAME  = local.DEMO_OANDA_SECRET_NAME
+    ACCOUNT_MODE = local.ACCOUNT_MODE_DEMO # デモ環境
+    LEVERAGE     = 7.7
   }
   log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn
   log_processor_lambda_name = aws_lambda_function.log_processor_lambda.function_name
@@ -158,11 +144,9 @@ module "lambda_pers_compound_investment_controller" {
   runtime                = "python3.12"
   role_arn               = aws_iam_role.lambda_exec.arn
   environment_variables = {
-    OANDA_RESTAPI_TOKEN = local.PERS_OANDA_RESTAPI_TOKEN
-    OANDA_ACCOUNT_ID    = local.PERS_OANDA_ACCOUNT_ID
-    OANDA_API_URL       = local.PERS_OANDA_API_URL
-    ACCOUNT_MODE        = local.ACCOUNT_MODE_PERS # 個人環境
-    LEVERAGE            = 3.0
+    SECRET_NAME  = local.PERS_OANDA_SECRET_NAME
+    ACCOUNT_MODE = local.ACCOUNT_MODE_PERS # 個人環境
+    LEVERAGE     = 3.0
   }
   log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn
   log_processor_lambda_name = aws_lambda_function.log_processor_lambda.function_name
@@ -180,11 +164,9 @@ module "lambda_corp_compound_investment_controller" {
   runtime                = "python3.12"
   role_arn               = aws_iam_role.lambda_exec.arn
   environment_variables = {
-    OANDA_RESTAPI_TOKEN = local.CORP_OANDA_RESTAPI_TOKEN
-    OANDA_ACCOUNT_ID    = local.CORP_OANDA_ACCOUNT_ID
-    OANDA_API_URL       = local.CORP_OANDA_API_URL
-    ACCOUNT_MODE        = local.ACCOUNT_MODE_CORP # 法人環境
-    LEVERAGE            = 3.0
+    SECRET_NAME  = local.CORP_OANDA_SECRET_NAME
+    ACCOUNT_MODE = local.ACCOUNT_MODE_CORP # 法人環境
+    LEVERAGE     = 3.0
   }
   log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn
   log_processor_lambda_name = aws_lambda_function.log_processor_lambda.function_name
@@ -202,11 +184,9 @@ module "lambda_demo_position_protect_controller" {
   runtime                = "python3.12"
   role_arn               = aws_iam_role.lambda_exec.arn
   environment_variables = {
-    OANDA_RESTAPI_TOKEN = local.DEMO_OANDA_RESTAPI_TOKEN
-    OANDA_ACCOUNT_ID    = local.DEMO_OANDA_ACCOUNT_ID
-    OANDA_API_URL       = local.DEMO_OANDA_API_URL
-    ACCOUNT_MODE        = local.ACCOUNT_MODE_DEMO # デモ環境
-    LEVERAGE            = 7.7
+    SECRET_NAME  = local.DEMO_OANDA_SECRET_NAME
+    ACCOUNT_MODE = local.ACCOUNT_MODE_DEMO # デモ環境
+    LEVERAGE     = 7.7
   }
   log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn
   log_processor_lambda_name = aws_lambda_function.log_processor_lambda.function_name
@@ -224,11 +204,9 @@ module "lambda_pers_position_protect_controller" {
   runtime                = "python3.12"
   role_arn               = aws_iam_role.lambda_exec.arn
   environment_variables = {
-    OANDA_RESTAPI_TOKEN = local.PERS_OANDA_RESTAPI_TOKEN
-    OANDA_ACCOUNT_ID    = local.PERS_OANDA_ACCOUNT_ID
-    OANDA_API_URL       = local.PERS_OANDA_API_URL
-    ACCOUNT_MODE        = local.ACCOUNT_MODE_PERS # 個人環境
-    LEVERAGE            = 3.0
+    SECRET_NAME  = local.PERS_OANDA_SECRET_NAME
+    ACCOUNT_MODE = local.ACCOUNT_MODE_PERS # 個人環境
+    LEVERAGE     = 3.0
   }
   log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn
   log_processor_lambda_name = aws_lambda_function.log_processor_lambda.function_name
@@ -246,11 +224,9 @@ module "lambda_corp_position_protect_controller" {
   runtime                = "python3.12"
   role_arn               = aws_iam_role.lambda_exec.arn
   environment_variables = {
-    OANDA_RESTAPI_TOKEN = local.CORP_OANDA_RESTAPI_TOKEN
-    OANDA_ACCOUNT_ID    = local.CORP_OANDA_ACCOUNT_ID
-    OANDA_API_URL       = local.CORP_OANDA_API_URL
-    ACCOUNT_MODE        = local.ACCOUNT_MODE_CORP # 法人環境
-    LEVERAGE            = 3.0
+    SECRET_NAME  = local.CORP_OANDA_SECRET_NAME
+    ACCOUNT_MODE = local.ACCOUNT_MODE_CORP # 法人環境
+    LEVERAGE     = 3.0
   }
   log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn
   log_processor_lambda_name = aws_lambda_function.log_processor_lambda.function_name

@@ -10,10 +10,13 @@ path_ = os.path.abspath(
 )
 sys.path.insert(0, path_)
 
-os.environ["OANDA_ACCOUNT_ID"] = "test"
-os.environ["OANDA_RESTAPI_TOKEN"] = "test"
-os.environ["OANDA_API_URL"] = "test"
+os.environ["SECRET_NAME"] = "test"
 os.environ["ACCOUNT_MODE"] = "test"
+_credentials = {
+    "OANDA_ACCOUNT_ID": "test",
+    "OANDA_RESTAPI_TOKEN": "test",
+    "OANDA_API_URL": "test",
+}
 
 from position_protect_controller.resources.lambda_function import (
     PositionProtect,
@@ -23,13 +26,9 @@ from position_protect_controller.resources.lambda_function import (
 
 @pytest.fixture
 def position_protect():
+    OANDA._get_credentials = MagicMock().return_value(_credentials)
     OANDA._create_client = MagicMock()
-    oanda = OANDA(
-        account_id="test",
-        api_key="test",
-        api_url="test",
-        account_mode="test",
-    )
+    oanda = OANDA(account_mode="test")
 
     position_protect = PositionProtect(oanda)
 
