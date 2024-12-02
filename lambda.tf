@@ -13,44 +13,44 @@ locals {
 ###
 # Each Modules
 ###
-module "lambda_check_event" {
-  source        = "./modules/lambda/functions/check_event"
-  function_name = "${local.project_name}-check-event-function"
-  function_path = "check_event"
-  handler       = "lambda_function.lambda_handler"
-  runtime       = "python3.12"
-  role_arn      = aws_iam_role.lambda_exec.arn
-  environment_variables = {
-    OANDA_RESTAPI_TOKEN = local.DEMO_OANDA_RESTAPI_TOKEN
-    OANDA_ACCOUNT_ID    = local.DEMO_OANDA_ACCOUNT_ID
-  }
-}
+# module "lambda_check_event" {
+#   source        = "./modules/lambda/functions/check_event"
+#   function_name = "${local.project_name}-check-event-function"
+#   function_path = "check_event"
+#   handler       = "lambda_function.lambda_handler"
+#   runtime       = "python3.12"
+#   role_arn      = aws_iam_role.lambda_exec.arn
+#   environment_variables = {
+#     OANDA_RESTAPI_TOKEN = local.DEMO_OANDA_RESTAPI_TOKEN
+#     OANDA_ACCOUNT_ID    = local.DEMO_OANDA_ACCOUNT_ID
+#   }
+# }
 
-module "lambda_oanda_controller" {
-  source        = "./modules/lambda/functions/oanda_controller"
-  function_name = "${local.project_name}-oanda-controller-function"
-  function_path = "oanda_controller"
-  handler       = "lambda_function.lambda_handler"
-  runtime       = "python3.12"
-  role_arn      = aws_iam_role.lambda_exec.arn
-  environment_variables = {
-    OANDA_RESTAPI_TOKEN = local.DEMO_OANDA_RESTAPI_TOKEN
-    OANDA_ACCOUNT_ID    = local.DEMO_OANDA_ACCOUNT_ID
-  }
-}
+# module "lambda_oanda_controller" {
+#   source        = "./modules/lambda/functions/oanda_controller"
+#   function_name = "${local.project_name}-oanda-controller-function"
+#   function_path = "oanda_controller"
+#   handler       = "lambda_function.lambda_handler"
+#   runtime       = "python3.12"
+#   role_arn      = aws_iam_role.lambda_exec.arn
+#   environment_variables = {
+#     OANDA_RESTAPI_TOKEN = local.DEMO_OANDA_RESTAPI_TOKEN
+#     OANDA_ACCOUNT_ID    = local.DEMO_OANDA_ACCOUNT_ID
+#   }
+# }
 
-module "lambda_demo_esperanto_controller" {
-  source        = "./modules/lambda/functions/esperanto_controller"
-  function_name = "${local.project_name}-demo-esperanto-controller-function"
-  function_path = "esperanto_controller"
-  handler       = "lambda_function.lambda_handler"
-  runtime       = "python3.12"
-  role_arn      = aws_iam_role.lambda_exec.arn
-  environment_variables = {
-    OANDA_RESTAPI_TOKEN = local.DEMO_OANDA_RESTAPI_TOKEN
-    OANDA_ACCOUNT_ID    = local.DEMO_OANDA_ACCOUNT_ID
-  }
-}
+# module "lambda_demo_esperanto_controller" {
+#   source        = "./modules/lambda/functions/esperanto_controller"
+#   function_name = "${local.project_name}-demo-esperanto-controller-function"
+#   function_path = "esperanto_controller"
+#   handler       = "lambda_function.lambda_handler"
+#   runtime       = "python3.12"
+#   role_arn      = aws_iam_role.lambda_exec.arn
+#   environment_variables = {
+#     OANDA_RESTAPI_TOKEN = local.DEMO_OANDA_RESTAPI_TOKEN
+#     OANDA_ACCOUNT_ID    = local.DEMO_OANDA_ACCOUNT_ID
+#   }
+# }
 
 module "lambda_demo_accumulation_controller" {
   source                 = "./modules/lambda/functions/accumulation_controller"
@@ -261,9 +261,24 @@ resource "aws_iam_role_policy_attachment" "lambda_exec_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-output "lambda_check_event_function_arn" {
-  value = module.lambda_check_event.lambda_function_arn
+resource "aws_iam_role_policy" "get_secrets_policy" {
+  role = aws_iam_role.lambda_exec.name
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action   = "secretsmanager:GetSecretValue",
+        Effect   = "Allow",
+        Resource = "*"
+      }
+    ]
+  })
 }
+
+# output "lambda_check_event_function_arn" {
+#   value = module.lambda_check_event.lambda_function_arn
+# }
 
 ###
 # LogProcesser to SNS
