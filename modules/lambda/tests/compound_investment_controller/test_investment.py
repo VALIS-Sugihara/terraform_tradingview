@@ -259,6 +259,13 @@ class TestInvestment:
         weekday_count = Investment.count_weekdays_in_month(date(2024, 10, 1))
         assert expected_weekday_count == weekday_count
 
+    def test_count_weekdays_in_month_return_collect_value_at_December(self, investment):
+        # 12 月の際にエラーとならず正しい値が返っているかをテストする
+        # 2024/12 は平日が 22日
+        expected_weekday_count = 22
+        weekday_count = Investment.count_weekdays_in_month(date(2024, 12, 1))
+        assert expected_weekday_count == weekday_count
+
 
 class TestCompoundInvestment:
 

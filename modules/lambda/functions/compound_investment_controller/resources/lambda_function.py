@@ -979,8 +979,9 @@ class Investment:
 
         # 当月の初日と最終日を取得
         first_day_of_month = today.replace(day=1)
+        next_month = (today.month + 1) - 12 if today.month >= 12 else today.month + 1
         last_day_of_month = first_day_of_month.replace(
-            month=today.month + 1, day=1
+            month=next_month, day=1
         ) - timedelta(days=1)
 
         # 平日をカウントする変数
