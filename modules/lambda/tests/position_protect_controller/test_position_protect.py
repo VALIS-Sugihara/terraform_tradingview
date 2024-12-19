@@ -770,3 +770,15 @@ class TestPositionProtect:
             target_datetime
         )
         assert expected_flag == actual_flag
+
+    @patch(
+        "position_protect_controller.resources.lambda_function.OANDA.Trade.request_open_trades"
+    )
+    def test_get_total_tickets_amount_return_collect_value(
+        self, mock_request_open_trades, position_protect
+    ):
+        dummy_open_trades_response = {"trades": [{}, {}, {}, {}, {}, {}, {}]}
+        mock_request_open_trades.return_value = dummy_open_trades_response
+        expected_value = len(dummy_open_trades_response["trades"])
+        actual_value = position_protect.get_total_tickets_amount()
+        assert expected_value == actual_value

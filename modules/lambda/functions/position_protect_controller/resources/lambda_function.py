@@ -1182,6 +1182,15 @@ class PositionProtect:
 
         return each_currency_position
 
+    def get_total_tickets_amount(self):
+        """総チケット数(=オープンポジション数）を返す関数
+
+        Returns:
+            (int): チケット枚数 = open_trades_response.trades の配列数
+        """
+        open_trades_response = self.platform.trade.request_open_trades()
+        return len(open_trades_response["trades"])
+
     def is_correct_currency(self, instrument: str):
         """扱う通貨ペアに含まれているかを判定する関数
 
@@ -1265,6 +1274,34 @@ def execute_position_protect():
             each_currency_position = position_protect.trim_position(each_currency_position)
             position_protect.platform.account.update_account_summary()
             logger.info(f"現在の口座維持率は {(position_protect.platform.account.get_net_asset_value()/position_protect.platform.account.get_margin_used())*100}% です")
+
+        # チケット数が 800枚を上回ったらマージする
+        if position_protect.get_total_tickets_amount() > 800:
+            execute_merge_tickets(position_protect)
+
+
+def execute_merge_tickets(position_protect: PositionProtect):
+    # 3枚ずつ行うものとする
+    each_currency_position = position_protect.get_top_losing_positions_by_pair(top_n=3)
+    for instrument, order_list in each_currency_position.items():
+        close_units: int = 0
+        for order in order_list:
+            close_trade_id = order["id"]
+            close_order_data = (
+                position_protect.platform.trade._make_close_order_data()
+            )  # TODO: 一旦、units:ALL とする
+            position_protect.platform.trade.request_close_order(
+                trade_id=close_trade_id, close_data=close_order_data
+            )
+            close_units += int(order["currentUnits"])
+            logger.info(f"id:{close_trade_id}, {order["instrument"]}:{order["price"]} のポジションを {order["currentUnits"]}枚決済しました")
+            logger.info(f"現時点での {order["instrument"]} のクローズ枚数は {str(close_units)}枚です")
+
+        order_data = position_protect.platform.trade._make_place_order_data(
+            units=close_units, instrument=instrument
+        )
+        position_protect.platform.trade.request_place_order(order_data)
+        logger.info(f"{instrument} を {close_units} 枚発注しました")
 
 
 # ローカルテスト
