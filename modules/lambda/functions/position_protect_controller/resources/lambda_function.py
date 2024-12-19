@@ -1276,7 +1276,9 @@ def execute_position_protect():
             logger.info(f"現在の口座維持率は {(position_protect.platform.account.get_net_asset_value()/position_protect.platform.account.get_margin_used())*100}% です")
 
         # チケット数が 800枚を上回ったらマージする
-        if position_protect.get_total_tickets_amount() > 800:
+        total_tickets_amount = position_protect.get_total_tickets_amount()
+        if total_tickets_amount > 800:
+            logger.info(f"チケット総数が {total_tickets_amount}枚です")
             execute_merge_tickets(position_protect)
 
 
