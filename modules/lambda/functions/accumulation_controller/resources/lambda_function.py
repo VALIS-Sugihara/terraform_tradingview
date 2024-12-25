@@ -9,7 +9,7 @@ from oandapyV20.endpoints import (
     trades,
 )
 from typing import NamedTuple, Dict, List, Tuple
-from datetime import datetime, timedelta, date, timezone
+from datetime import datetime, timedelta, date, timezone, UTC
 import logging
 import traceback
 import re
@@ -789,7 +789,7 @@ class OANDA:
                 response={
                     'from': '2024-10-01T04:00:00.000000000Z',
                     'to': '2024-10-03T04:00:00.000000000Z',
-                    'pageSize': 100,
+                    'pageSize': 1000,
                     'type': ['DAILY_FINANCING'],
                     'count': 2,
                     'pages': ['https://api-fxpractice.oanda.com/v3/accounts/101-009-30020937-001/transactions/idrange?from=114&to=121&type=DAILY_FINANCING'],
@@ -801,7 +801,7 @@ class OANDA:
                 "from": from_date,
                 "to": to_date,
                 "type": transaction_type,  # Filter for DAILY_INTEREST transaction types
-                "pageSize": 100,  # Adjust page size as needed
+                "pageSize": 1000,  # Adjust page size as needed
             }
             request = transactions.TransactionList(
                 accountID=self.oanda.account_id, params=params
@@ -910,7 +910,7 @@ class OANDA:
                 "from": from_id,
                 "to": to_id,
                 "type": transaction_type,  # Filter for DAILY_INTEREST transaction types
-                "pageSize": 100,  # Adjust page size as needed
+                "pageSize": 1000,  # Adjust page size as needed
             }
             request = transactions.TransactionIDRange(
                 accountID=self.oanda.account_id, params=params
@@ -1237,6 +1237,73 @@ class Accumulation(Investment):
         # 実行日が25日もしくは直前の金曜日かどうかを判定
         return execution_date.day == target_date.day
 
+    def is_under_gold_status_threshold(self):
+        """GOLD STATUS 維持条件である月内取引が 50万$ 以下かを判定する関数
+
+        Returns:
+            (boolean): 月内取引額が 50万$ 以下であれば True
+        """
+        GOLD_STATUS_THRESHOLD = 500000
+        return GOLD_STATUS_THRESHOLD > self.get_current_month_trade_volume()
+
+    def get_current_month_trade_volume(self):
+        """最新の swappoint を取得するための関数"""
+        # 対象日付を取得する
+        from_date, to_date = Accumulation.make_between_dates_based_on_month()
+        # トランザクション一覧を取得する
+        list_data = self.platform.account.request_transaction_list_between_dates(
+            from_date=from_date, to_date=to_date, transaction_type="ORDER_FILL"
+        )
+        # 一覧から from id を求める
+        from_id = self.platform.account.get_transaction_id_by_list(list_data, "from")
+        # 一覧から to id を求める
+        to_id = self.platform.account.get_transaction_id_by_list(list_data, "to")
+        # トランザクション詳細を from-to の id から取得する
+        transaction_details = self.platform.account.request_transaction_id_range(
+            from_id=from_id, to_id=to_id, transaction_type="ORDER_FILL"
+        )
+        # それぞれの financing の値を USD ベースで換算し返す  注）実行日と約定日のレートに差があるため概算となる点注意
+        volume = 0
+        usd_rate = float(self.platform.price.price_map["USD_JPY"].mid)
+        for transaction_detail in transaction_details["transactions"]:
+            if transaction_detail["instrument"] == "USD_JPY":
+                usd_rate = float(transaction_detail["price"])
+            if (
+                "USD" in transaction_detail["instrument"]
+            ):  # USD ベースの場合は数量を計算
+                volume += abs(float(transaction_detail["units"]))
+            else:  # それ以外は近辺の日のレートを参考にする
+                volume += (
+                    abs(float(transaction_detail["units"]))
+                    * abs(float(transaction_detail["price"]))
+                    / usd_rate
+                )
+
+        return volume
+
+    @classmethod
+    def make_between_dates_based_on_month(cls, target_datetime: datetime = None):
+        """
+        その月の
+            from: 月初 の yyyy-mm-dd と to: 月末 の yyyy-mm-dd を返す
+
+        Args:
+            target_date_time (datetime, optional): 指定日時（テスト用）. Defaults to None.
+
+        Returns:
+            (tuple): (from: str, to: str) 対象日の yyyy-mm-dd の組み合わせ
+        """
+        # UTC ベースで算出（月初の 09:30 JST 実行時には UTC でも月初になっているため）
+        today = datetime.now(UTC) if target_datetime is None else target_datetime
+        # 月初日を計算
+        from_date = today.replace(day=1)
+
+        # 月末日を計算
+        next_month = today.replace(day=28) + timedelta(days=4)  # 次の月を計算
+        to_date = next_month.replace(day=1) - timedelta(days=1)  # 当月の最終日
+
+        return from_date.strftime("%Y-%m-%d"), to_date.strftime("%Y-%m-%d")
+
     def __change_account_mode(self):
         """アカウントモードによる調整を行う
         DEMO: デモ環境, PERS: 個人本番環境, CORP: 法人本番環境
@@ -1282,12 +1349,15 @@ def lambda_handler(event, context):
 
     try:
         logger.info("Starting execute_accumulation ...")
-        execute_accumulation()
+        accumulation: Accumulation = execute_accumulation()
         logger.info("Success placing orders")
 
         # 毎月平日 25日 or 直前の金曜日であれば月間購入額の調整を行う
-        if Accumulation.is_25th_or_previous_friday_today(
-            Accumulation.get_25th_or_previous_friday()
+        if (
+            Accumulation.is_25th_or_previous_friday_today(
+                Accumulation.get_25th_or_previous_friday()
+            )
+            and accumulation.is_under_gold_status_threshold()
         ):
             logger.info("Starting keep_gold_status ...")
             keep_gold_status()
@@ -1313,6 +1383,8 @@ def execute_accumulation():
         return
     # 買付けの実施
     accumulation.execute_purchase(daily_amount)
+
+    return accumulation
 
 
 def keep_gold_status():
@@ -1364,4 +1436,7 @@ def keep_gold_status():
 
 # ローカルテスト
 if __name__ == "__main__":
-    lambda_handler(None, None)
+    oanda = OANDA(account_mode=ACCOUNT_MODE)
+    accumulation = Accumulation(platform=oanda, leverage=LEVERAGE)
+    daily_amount = accumulation.get_current_month_trade_volume()
+    # lambda_handler(None, None)
