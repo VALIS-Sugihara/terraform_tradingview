@@ -774,7 +774,7 @@ class TestPositionProtect:
     @patch(
         "position_protect_controller.resources.lambda_function.OANDA.Trade.request_open_trades"
     )
-    def test_get_total_tickets_amount_return_collect_value(
+    def test_get_total_tickets_amount_return_correct_value(
         self, mock_request_open_trades, position_protect
     ):
         dummy_open_trades_response = {"trades": [{}, {}, {}, {}, {}, {}, {}]}

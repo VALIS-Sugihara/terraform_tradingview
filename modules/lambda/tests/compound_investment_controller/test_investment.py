@@ -57,7 +57,7 @@ def compound_investment():
 
 class TestInvestment:
 
-    def test_calcurate_usdjpy_amount_return_collect_value(self, investment):
+    def test_calcurate_usdjpy_amount_return_correct_value(self, investment):
         # 正しい値が返っていることをテストする
         price_map = {"USD_JPY": OANDA.Price.Prices(90, 100, 95)}  # bid,ask,mid
         # USD_JPY: 100円の時に 150000円分買うとレバレッジが適用され 3倍であれば 4500枚
@@ -66,7 +66,7 @@ class TestInvestment:
         actual_usd_amount = investment.calcurate_usdjpy_amount(jpy_amount, price_map)
         assert expected_usd_amount == actual_usd_amount
 
-    def test_calcurate_tryjpy_amount_return_collect_value(self, investment):
+    def test_calcurate_tryjpy_amount_return_correct_value(self, investment):
         # 正しい値が返っていることをテストする
         # 150000円分買うとレバレッジ分割られて 3倍であれば 50000枚
         jpy_amount = 150000
@@ -74,7 +74,7 @@ class TestInvestment:
         actual_try_amount = investment.calcurate_tryjpy_amount(jpy_amount)
         assert expected_try_amount == actual_try_amount
 
-    def test_calculate_required_margin_return_collect_value(self, investment):
+    def test_calculate_required_margin_return_correct_value(self, investment):
         # 正しい値が返っていることをテストする
 
         # USD_JPY: 100円 であれば、USD を 10000枚買うには 22,000円必要
@@ -168,7 +168,7 @@ class TestInvestment:
     @patch(
         "compound_investment_controller.resources.lambda_function.OANDA.Account.get_net_asset_value"
     )
-    def test_verify_purchase_requirements_collect_flag(
+    def test_verify_purchase_requirements_correct_flag(
         self,
         mock_get_net_asset_value,
         mock_get_margin_used,
@@ -259,7 +259,7 @@ class TestInvestment:
         weekday_count = Investment.count_weekdays_in_month(date(2024, 10, 1))
         assert expected_weekday_count == weekday_count
 
-    def test_count_weekdays_in_month_return_collect_value_at_December(self, investment):
+    def test_count_weekdays_in_month_return_correct_value_at_December(self, investment):
         # 12 月の際にエラーとならず正しい値が返っているかをテストする
         # 2024/12 は平日が 22日
         expected_weekday_count = 22
@@ -269,7 +269,7 @@ class TestInvestment:
 
 class TestCompoundInvestment:
 
-    def test_execute_purchase_take_collect_args(self, compound_investment):
+    def test_execute_purchase_take_correct_args(self, compound_investment):
         # request_place_order が正しい値を受け取っていることをテストする
         compound_investment.verify_purchase_requirements = MagicMock()
         compound_investment.verify_purchase_requirements.return_value = True
@@ -323,7 +323,7 @@ class TestCompoundInvestment:
     @patch(
         "compound_investment_controller.resources.lambda_function.CompoundInvestment.make_between_dates_based_on_day"
     )
-    def test_get_daily_swap_points_return_collect_value(
+    def test_get_daily_swap_points_return_correct_value(
         self, mock_make_between_dates_based_on_day, compound_investment
     ):
         # 正しい swappoint を返していることをテストする
@@ -384,7 +384,7 @@ class TestCompoundInvestment:
         actual_value = compound_investment.get_daily_swap_points()
         assert expected_value == actual_value
 
-    def test_make_between_dates_based_on_day_return_collect_value_on_monday(self):
+    def test_make_between_dates_based_on_day_return_correct_value_on_monday(self):
         # 月曜日指定で正しい from 日付, to 日付 を返していることをテストする
         target_datetime = datetime(2024, 9, 30)  # 2024/09/29 は日曜日
         expected_value = ("2024-09-27", "2024-09-30")
@@ -393,7 +393,7 @@ class TestCompoundInvestment:
         )
         assert expected_value == actual_value
 
-    def test_make_between_dates_based_on_day_return_collect_value_on_monday_else(self):
+    def test_make_between_dates_based_on_day_return_correct_value_on_monday_else(self):
         # 月曜日以外の指定で正しい from 日付, to 日付 を返していることをテストする
         target_datetime = datetime(2024, 10, 3)  # 2024/10/03 は木曜日
         expected_value = ("2024-10-02", "2024-10-03")
