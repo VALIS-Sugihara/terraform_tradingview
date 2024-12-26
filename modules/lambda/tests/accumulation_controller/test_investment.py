@@ -393,3 +393,125 @@ class TestAccumulation:
             target_date, execution_date
         )
         assert excepted_value == actual_value
+
+    @patch(
+        "accumulation_controller.resources.lambda_function.Accumulation.get_current_month_trade_volume"
+    )
+    def test_is_under_gold_status_threshold_return_true(
+        self, mock_get_current_month_trade_volume, accumulation
+    ):
+        # ゴールドステータス判定が正しいことをテストする
+        expected_value = False
+        mock_get_current_month_trade_volume.return_value = 500000
+        actual_value = accumulation.is_under_gold_status_threshold()
+        assert expected_value == actual_value
+
+    @patch(
+        "accumulation_controller.resources.lambda_function.Accumulation.get_current_month_trade_volume"
+    )
+    def test_is_under_gold_status_threshold_return_false(
+        self, mock_get_current_month_trade_volume, accumulation
+    ):
+        # ゴールドステータス判定が正しいことをテストする
+        expected_value = True
+        mock_get_current_month_trade_volume.return_value = 499999
+        actual_value = accumulation.is_under_gold_status_threshold()
+        assert expected_value == actual_value
+
+        # ゴールドステータス判定が正しいことをテストする
+        expected_value = True
+        mock_get_current_month_trade_volume.return_value = 1
+        actual_value = accumulation.is_under_gold_status_threshold()
+        assert expected_value == actual_value
+
+        # ゴールドステータス判定が正しいことをテストする
+        expected_value = True
+        mock_get_current_month_trade_volume.return_value = 0
+        actual_value = accumulation.is_under_gold_status_threshold()
+        assert expected_value == actual_value
+
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.request_transaction_list_between_dates"
+    )
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.get_transaction_id_by_list"
+    )
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.request_transaction_id_range"
+    )
+    def test_get_current_month_trade_volume_return_correct_value(
+        self,
+        mock_request_transaction_id_range,
+        mock_get_transaction_id_by_list,
+        mock_request_transaction_list_between_dates,
+        accumulation,
+    ):
+        # 月内取引総量が正しく計算されていることをテストする
+        mock_request_transaction_list_between_dates.return_value = (
+            "2024-12-01",
+            "2024-12-31",
+        )
+        mock_request_transaction_id_range.return_value = {
+            "transactions": [
+                {"instrument": "USD_JPY", "units": "111", "price": "150.0"},
+                {
+                    "instrument": "USD_MXN",
+                    "units": "-111",
+                },
+                {"instrument": "TRY_JPY", "units": "150", "price": "4"},
+            ]
+        }
+        expected_value = 226
+        actual_value = accumulation.get_current_month_trade_volume()
+        assert expected_value == actual_value
+
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.request_transaction_list_between_dates"
+    )
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.get_transaction_id_by_list"
+    )
+    @patch(
+        "accumulation_controller.resources.lambda_function.OANDA.Account.request_transaction_id_range"
+    )
+    def test_get_current_month_trade_volume_caluculated_correct_price(
+        self,
+        mock_request_transaction_id_range,
+        mock_get_transaction_id_by_list,
+        mock_request_transaction_list_between_dates,
+        accumulation,
+    ):
+        # 月内取引総量の USD_JPY レートが正しく計算されていることをテストする
+        mock_request_transaction_list_between_dates.return_value = (
+            "2024-12-01",
+            "2024-12-31",
+        )
+        mock_request_transaction_id_range.return_value = {
+            "transactions": [
+                {
+                    "instrument": "USD_MXN",
+                    "units": "-111",
+                },
+                {"instrument": "TRY_JPY", "units": "150", "price": "4"},
+                {"instrument": "USD_JPY", "units": "111", "price": "150"},
+            ]
+        }
+        # price_map の USD_JPY.bid の初期値が Mock 上 1なので
+        expected_value = 822
+        actual_value = accumulation.get_current_month_trade_volume()
+        assert expected_value == actual_value
+
+        mock_request_transaction_id_range.return_value = {
+            "transactions": [
+                {"instrument": "USD_JPY", "units": "111", "price": "100"},
+                {
+                    "instrument": "USD_MXN",
+                    "units": "-111",
+                },
+                {"instrument": "TRY_JPY", "units": "150", "price": "4"},
+            ]
+        }
+        # 上記の USD_JPY の price: 100 が採用されているはずなので
+        expected_value = 228
+        actual_value = accumulation.get_current_month_trade_volume()
+        assert expected_value == actual_value

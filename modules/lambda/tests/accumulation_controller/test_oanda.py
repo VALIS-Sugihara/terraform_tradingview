@@ -234,7 +234,7 @@ class TestAccount:
                 "from": args["from_date"],
                 "to": args["to_date"],
                 "type": args["transaction_type"],
-                "pageSize": 100,
+                "pageSize": 1000,
             },
         }
         oanda.account.request_transaction_list_between_dates(**args)
@@ -296,7 +296,7 @@ class TestAccount:
                 "from": args["from_id"],
                 "to": args["to_id"],
                 "type": args["transaction_type"],
-                "pageSize": 100,
+                "pageSize": 1000,
             },
         }
         oanda.account.request_transaction_id_range(**args)
