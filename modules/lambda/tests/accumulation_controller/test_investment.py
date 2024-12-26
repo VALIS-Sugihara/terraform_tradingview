@@ -515,3 +515,44 @@ class TestAccumulation:
         expected_value = 228
         actual_value = accumulation.get_current_month_trade_volume()
         assert expected_value == actual_value
+
+    def test_make_between_dates_based_on_month_return_correct_dates(self):
+        # 正しい月初と月末日付を返しているかテストする
+        expected_value = (
+            "2024-12-01",
+            "2024-12-31",
+        )
+        actual_value = Accumulation.make_between_dates_based_on_month(
+            datetime(year=2024, month=12, day=2)
+        )
+        assert expected_value == actual_value
+
+        # 正しい月初と月末日付を返しているかテストする
+        expected_value = (
+            "2024-01-01",
+            "2024-01-31",
+        )
+        actual_value = Accumulation.make_between_dates_based_on_month(
+            datetime(year=2024, month=1, day=31)
+        )
+        assert expected_value == actual_value
+
+        # 正しい月初と月末日付を返しているかテストする（閏年）
+        expected_value = (
+            "2024-02-01",
+            "2024-02-29",
+        )
+        actual_value = Accumulation.make_between_dates_based_on_month(
+            datetime(year=2024, month=2, day=1)
+        )
+        assert expected_value == actual_value
+
+        # 正しい月初と月末日付を返しているかテストする（通常年）
+        expected_value = (
+            "2025-02-01",
+            "2025-02-28",
+        )
+        actual_value = Accumulation.make_between_dates_based_on_month(
+            datetime(year=2025, month=2, day=1)
+        )
+        assert expected_value == actual_value
