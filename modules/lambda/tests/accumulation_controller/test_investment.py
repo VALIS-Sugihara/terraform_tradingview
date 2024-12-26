@@ -363,33 +363,33 @@ class TestAccumulation:
         target_date = date(2024, 10, 25)  # 2024/10/25 は金曜日
         execution_date = date(2024, 10, 25)  # 2024/10/25 は金曜日
         excepted_value = True
-        actual_value = Accumulation.is_25th_or_previous_friday_today(
+        actual_value = Accumulation.is_after_25th_or_previous_friday_today(
             target_date, execution_date
         )
         assert excepted_value == actual_value
-        # 25日が土日の月の場合、指定日に実行すると true が返ることをテストする
+        # 25日が土日の月の場合、直前の金曜日に実行すると true が返ることをテストする
         target_date = date(2024, 8, 23)  # 2024/8/23 は金曜日
         execution_date = date(2024, 8, 23)  # 2024/8/23 は金曜日
         excepted_value = True
-        actual_value = Accumulation.is_25th_or_previous_friday_today(
+        actual_value = Accumulation.is_after_25th_or_previous_friday_today(
+            target_date, execution_date
+        )
+        assert excepted_value == actual_value
+        # 25日以降に実行すると True が返ることをテストする
+        target_date = date(2024, 10, 25)  # 2024/10/25 は金曜日
+        execution_date = date(2024, 10, 28)  # 2024/10/28 は月曜日
+        excepted_value = True
+        actual_value = Accumulation.is_after_25th_or_previous_friday_today(
             target_date, execution_date
         )
         assert excepted_value == actual_value
 
     def test_is_25th_or_previous_friday_return_false(self):
-        # 25日が平日の月の場合、違う日に実行すると False が返ることをテストする
+        # 25日が平日の月の場合、25日以前の違う日に実行すると False が返ることをテストする
         target_date = date(2024, 10, 25)  # 2024/10/25 は金曜日
         execution_date = date(2024, 10, 24)  # 2024/10/24 は木曜日
         excepted_value = False
-        actual_value = Accumulation.is_25th_or_previous_friday_today(
-            target_date, execution_date
-        )
-        assert excepted_value == actual_value
-        # 25日が土日の月の場合、25日に実行すると False が返ることをテストする
-        target_date = date(2024, 8, 23)  # 2024/8/23 は金曜日
-        execution_date = date(2024, 8, 25)  # 2024/8/25 は日曜日
-        excepted_value = False
-        actual_value = Accumulation.is_25th_or_previous_friday_today(
+        actual_value = Accumulation.is_after_25th_or_previous_friday_today(
             target_date, execution_date
         )
         assert excepted_value == actual_value

@@ -1218,10 +1218,10 @@ class Accumulation(Investment):
         return previous_friday.date()
 
     @classmethod
-    def is_25th_or_previous_friday_today(
+    def is_after_25th_or_previous_friday_today(
         cls, target_date: date = None, execution_date: date = None
     ):
-        """実行日が 25日もしくは直前の金曜日の日付であるか否かの判定をする関数
+        """実行日が 25日もしくは直前の金曜日の以降の日付であるか否かの判定をする関数
             ※毎月 25日付近で関数を実行するための判定用
 
         Args:
@@ -1229,13 +1229,13 @@ class Accumulation(Investment):
             execution_date (date, optional): 関数実行日（主にテスト用）. Defaults to None.
 
         Returns:
-            (boolean): 実行日が 25日もしくは直前の金曜日の日付であるか否か
+            (boolean): 実行日が 25日もしくは直前の金曜日以降の日付であるか否か
         """
         # 実行日が指定されていない場合現在の日付を取得
         execution_date = date.today() if execution_date is None else execution_date
 
         # 実行日が25日もしくは直前の金曜日かどうかを判定
-        return execution_date.day == target_date.day
+        return execution_date.day >= target_date.day
 
     def __change_account_mode(self):
         """アカウントモードによる調整を行う
@@ -1286,7 +1286,7 @@ def lambda_handler(event, context):
         logger.info("Success placing orders")
 
         # 毎月平日 25日 or 直前の金曜日であれば月間購入額の調整を行う
-        if Accumulation.is_25th_or_previous_friday_today(
+        if Accumulation.is_after_25th_or_previous_friday_today(
             Accumulation.get_25th_or_previous_friday()
         ):
             logger.info("Starting keep_gold_status ...")
