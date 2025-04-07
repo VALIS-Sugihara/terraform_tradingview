@@ -33,7 +33,13 @@ def investment():
 
     investment = Investment(oanda, 3)
     # OANDA の規定レバレッジを設定
-    investment.platform.leverages = {"USD_JPY": 0.022, "USD_MXN": 0.05, "TRY_JPY": 0.25}
+    investment.platform.leverages = {
+        "USD_JPY": 0.022,
+        "USD_MXN": 0.05,
+        "TRY_JPY": 0.25,
+        "GBP_JPY": 0.04,
+        "GBP_CHF": 0.04,
+    }
 
     return investment
 
@@ -60,6 +66,15 @@ class TestInvestment:
         actual_usd_amount = investment.calcurate_usdjpy_amount(jpy_amount, price_map)
         assert expected_usd_amount == actual_usd_amount
 
+    def test_calcurate_gbpjpy_amount_return_collect_value(self, investment):
+        # 正しい値が返っていることをテストする
+        price_map = {"GBP_JPY": OANDA.Price.Prices(190, 200, 195)}  # bid,ask,mid
+        # GBP_JPY: 200円の時に 150000円分買うとレバレッジが適用され 3倍であれば 2250枚
+        jpy_amount = 150000
+        expected_gbp_amount = 2250
+        actual_gbp_amount = investment.calcurate_gbpjpy_amount(jpy_amount, price_map)
+        assert expected_gbp_amount == actual_gbp_amount
+
     def test_calcurate_tryjpy_amount_return_collect_value(self, investment):
         # 正しい値が返っていることをテストする
         # 150000円分買うとレバレッジ分割られて 3倍であれば 50000枚
@@ -76,6 +91,16 @@ class TestInvestment:
         amount = 10000
         price_map = {"USD_JPY": OANDA.Price.Prices(90, 100, 95)}  # bid,ask,mid
         expected_required_margin = 22000  # 100*10000*0.022
+        actual_required_margin = investment.calculate_required_margin(
+            instrument=instrument, amount=amount, price_map=price_map
+        )
+        assert expected_required_margin == actual_required_margin
+
+        # GBP_JPY: 200円 であれば、GBP を 10000枚買うには 22,000円必要
+        instrument = "GBP_JPY"
+        amount = 10000
+        price_map = {"GBP_JPY": OANDA.Price.Prices(90, 200, 95)}  # bid,ask,mid
+        expected_required_margin = 80000  # 200*10000*0.04
         actual_required_margin = investment.calculate_required_margin(
             instrument=instrument, amount=amount, price_map=price_map
         )

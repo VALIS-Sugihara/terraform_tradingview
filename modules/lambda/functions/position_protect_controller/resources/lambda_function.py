@@ -106,9 +106,7 @@ class OANDA:
     client: oandapyV20.API  # API クライアント
     leverages: dict  # OANDA の規定レバレッジ
 
-    def __init__(
-        self, account_mode: str
-    ) -> None:
+    def __init__(self, account_mode: str) -> None:
         credentials = self._get_credentials()
         self.account_id = credentials["OANDA_ACCOUNT_ID"]
         self.api_key = credentials["OANDA_RESTAPI_TOKEN"]
@@ -528,7 +526,14 @@ class OANDA:
 
         PriceMap = Dict[str, Prices]
         price_map: PriceMap
-        main_currency_pairs = ("USD_JPY", "USD_MXN", "TRY_JPY")
+        # main_currency_pairs = ("USD_JPY", "USD_MXN", "TRY_JPY")
+        # 250331: TRY_JPY が新規取引停止となったため一時的にトリム対象から除外する
+        main_currency_pairs = (
+            "USD_JPY",
+            "USD_MXN",
+            # "GBP_JPY",
+            # "GBP_CHF",
+        )
 
         def __init__(self, oanda):
             self.oanda = oanda
@@ -938,7 +943,9 @@ class PositionProtect:
             self.platform.trade.request_close_order(
                 trade_id=close_trade_id, close_data=close_order_data
             )
-            logger.info(f"id:{each_currency_position[instrument][0]["id"]}, {each_currency_position[instrument][0]["instrument"]}:{each_currency_position[instrument][0]["price"]} のポジションを {each_currency_position[instrument][0]["currentUnits"]}枚決済しました")
+            logger.info(
+                f"id:{each_currency_position[instrument][0]["id"]}, {each_currency_position[instrument][0]["instrument"]}:{each_currency_position[instrument][0]["price"]} のポジションを {each_currency_position[instrument][0]["currentUnits"]}枚決済しました"
+            )
             # クローズしたポジションを削除する
             del each_currency_position[instrument][0]
 
@@ -1217,19 +1224,19 @@ class PositionProtect:
             (boolean): True | False
         """
         # 現在の UTC 時刻を取得、または指定 UTC 時刻を取得
-        now_utc = datetime.now(timezone.utc) if not target_utc_datetime else target_utc_datetime
+        now_utc = (
+            datetime.now(timezone.utc)
+            if not target_utc_datetime
+            else target_utc_datetime
+        )
         # ここで 9 時間加算した上で JST に変換する
         now_jst = now_utc + timedelta(hours=9)
 
         # 営業時間帯の除外リストを設定
         # 午前 6 時 59 分から午前 7 時 5 分
-        excluded_times_morning = [
-            (time(6, 59), time(7, 5))
-        ]
+        excluded_times_morning = [(time(6, 59), time(7, 5))]
         # 午前 5 時 59 分から午前 6 時 5 分
-        excluded_times_night = [
-            (time(5, 59), time(6, 5))
-        ]
+        excluded_times_night = [(time(5, 59), time(6, 5))]
 
         # 現在時刻が除外時間内に入っているかどうかをチェック
         for start, end in excluded_times_morning + excluded_times_night:
@@ -1270,10 +1277,16 @@ def execute_position_protect():
 
         each_currency_position = {}
         while position_protect.is_under_threshold() is True:
-            logger.info(f"口座維持率が {PROTECTION_THRESHOLD}% を下回りました。ポジション調整を行います...")
-            each_currency_position = position_protect.trim_position(each_currency_position)
+            logger.info(
+                f"口座維持率が {PROTECTION_THRESHOLD}% を下回りました。ポジション調整を行います..."
+            )
+            each_currency_position = position_protect.trim_position(
+                each_currency_position
+            )
             position_protect.platform.account.update_account_summary()
-            logger.info(f"現在の口座維持率は {(position_protect.platform.account.get_net_asset_value()/position_protect.platform.account.get_margin_used())*100}% です")
+            logger.info(
+                f"現在の口座維持率は {(position_protect.platform.account.get_net_asset_value()/position_protect.platform.account.get_margin_used())*100}% です"
+            )
 
         # チケット数が 800枚を上回ったらマージする
         total_tickets_amount = position_protect.get_total_tickets_amount()
@@ -1296,8 +1309,12 @@ def execute_merge_tickets(position_protect: PositionProtect):
                 trade_id=close_trade_id, close_data=close_order_data
             )
             close_units += int(order["currentUnits"])
-            logger.info(f"id:{close_trade_id}, {order["instrument"]}:{order["price"]} のポジションを {order["currentUnits"]}枚決済しました")
-            logger.info(f"現時点での {order["instrument"]} のクローズ枚数は {str(close_units)}枚です")
+            logger.info(
+                f"id:{close_trade_id}, {order["instrument"]}:{order["price"]} のポジションを {order["currentUnits"]}枚決済しました"
+            )
+            logger.info(
+                f"現時点での {order["instrument"]} のクローズ枚数は {str(close_units)}枚です"
+            )
 
         order_data = position_protect.platform.trade._make_place_order_data(
             units=close_units, instrument=instrument

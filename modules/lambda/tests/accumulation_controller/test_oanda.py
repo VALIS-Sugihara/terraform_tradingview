@@ -159,15 +159,19 @@ class TestPrice:
             "USD_JPY": (1, 2, 3),
             "USD_MXN": (4, 5, 6),
             "TRY_JPY": (7, 8, 9),
+            "GBP_JPY": (10, 11, 12),
+            "GBP_CHF": (13, 14, 15),
         }
         with patch(
             "accumulation_controller.resources.lambda_function.OANDA.Price.request_price",
-            side_effect=[(1, 2, 3), (4, 5, 6), (7, 8, 9)],
+            side_effect=[(1, 2, 3), (4, 5, 6), (7, 8, 9), (10, 11, 12), (13, 14, 15)],
         ):
             oanda.price._generate_price_map()
         assert oanda.price.price_map["USD_JPY"] == expected_data["USD_JPY"]
         assert oanda.price.price_map["USD_MXN"] == expected_data["USD_MXN"]
         assert oanda.price.price_map["TRY_JPY"] == expected_data["TRY_JPY"]
+        assert oanda.price.price_map["GBP_JPY"] == expected_data["GBP_JPY"]
+        assert oanda.price.price_map["GBP_CHF"] == expected_data["GBP_CHF"]
 
     @patch("accumulation_controller.resources.lambda_function.pricing.PricingInfo")
     def test_request_price_take_correct_args(self, mock_pricing_info, oanda):

@@ -140,14 +140,20 @@ class OANDA:
             leverages["USD_JPY"] = 0.04
             leverages["USD_MXN"] = 0.08
             leverages["TRY_JPY"] = 0.25
+            leverages["GBP_JPY"] = 0.05
+            leverages["GBP_CHF"] = 0.04
         elif self.account_mode == "CORP":  # 法人口座の場合のレバレッジ
-            leverages["USD_JPY"] = 0.022
+            leverages["USD_JPY"] = 0.03
             leverages["USD_MXN"] = 0.05
             leverages["TRY_JPY"] = 0.25
+            leverages["GBP_JPY"] = 0.04
+            leverages["GBP_CHF"] = 0.04
         elif self.account_mode == "DEMO":  # デモ口座の場合のレバレッジ
-            leverages["USD_JPY"] = 0.022
+            leverages["USD_JPY"] = 0.03
             leverages["USD_MXN"] = 0.05
             leverages["TRY_JPY"] = 0.25
+            leverages["GBP_JPY"] = 0.04
+            leverages["GBP_CHF"] = 0.04
 
         return leverages
 
@@ -592,7 +598,13 @@ class OANDA:
 
         PriceMap = Dict[str, Prices]
         price_map: PriceMap
-        main_currency_pairs = ("USD_JPY", "USD_MXN", "TRY_JPY")
+        main_currency_pairs = (
+            "USD_JPY",
+            "USD_MXN",
+            "TRY_JPY",
+            "GBP_JPY",
+            "GBP_CHF",
+        )
 
         def __init__(self, oanda):
             self.oanda = oanda
@@ -977,6 +989,18 @@ class Investment:
 
         return usd_amount
 
+    def calcurate_gbpjpy_amount(self, jpy_amount: int, price_map: dict):
+        """GBP_JPY の購入枚数を計算する関数
+
+        Args:
+            jpy_amount (int): 円単位での通貨量
+            price_map (dict): プライスマップ OANDA.Price.PriceMap
+        """
+        value = jpy_amount * self.leverage
+        gbp_amount = round(value / price_map["GBP_JPY"].ask)
+
+        return gbp_amount
+
     def calcurate_tryjpy_amount(self, jpy_amount: int):
         """TRY_JPY の購入枚数を計算する関数
 
@@ -1139,11 +1163,17 @@ class Accumulation(Investment):
         mxn_amount = usd_amount
         # TRY_JPY の購入枚数の計算
         try_amount = self.calcurate_tryjpy_amount(daily_amount)
+        # GBP_JPY の購入枚数の計算
+        gbp_amount = self.calcurate_gbpjpy_amount(daily_amount, price_map)
+        # GBP_CHF の購入枚数の計算（GBP 単位なので同量を購入
+        chf_amount = gbp_amount
         # 与信確認
         currency_pair_amounts = {
             "USD_JPY": usd_amount,
             "USD_MXN": mxn_amount,
             "TRY_JPY": try_amount,
+            "GBP_JPY": gbp_amount,
+            "GBP_CHF": chf_amount,
         }
         if self.verify_purchase_requirements(currency_pair_amounts, price_map):
             # USD_JPY の Long
@@ -1168,6 +1198,20 @@ class Accumulation(Investment):
             )
             self.platform.trade.request_place_order(try_order_data)
             logger.info(f"TRY_JPY を {try_amount} 枚発注しました")
+            # GBP_JPY の Long
+            # TODO: stoploss の設定
+            gbp_order_data = self.platform.trade._make_place_order_data(
+                units=gbp_amount, instrument="GBP_JPY"
+            )
+            self.platform.trade.request_place_order(gbp_order_data)
+            logger.info(f"GBP_JPY を {gbp_amount} 枚発注しました")
+            # GBP_CHF の Long
+            # TODO: stoploss の設定
+            chf_order_data = self.platform.trade._make_place_order_data(
+                units=chf_amount, instrument="GBP_CHF"
+            )
+            self.platform.trade.request_place_order(chf_order_data)
+            logger.info(f"GBP_CHF を {chf_amount} 枚発注しました")
 
     @classmethod
     def get_daily_amount(cls, monthly_amount: int, target_date: date = None):

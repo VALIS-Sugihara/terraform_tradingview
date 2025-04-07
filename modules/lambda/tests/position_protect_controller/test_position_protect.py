@@ -153,20 +153,20 @@ class TestPositionProtect:
                     "currentUnits": "-18",
                 },
             ],
-            "TRY_JPY": [
-                {
-                    "id": "4000",
-                    "instrument": "TRY_JPY",
-                    "price": "4.000",
-                    "currentUnits": "18",
-                },
-                {
-                    "id": "3",
-                    "instrument": "TRY_JPY",
-                    "price": "3.333",
-                    "currentUnits": "18",
-                },
-            ],
+            # "TRY_JPY": [
+            #     {
+            #         "id": "4000",
+            #         "instrument": "TRY_JPY",
+            #         "price": "4.000",
+            #         "currentUnits": "18",
+            #     },
+            #     {
+            #         "id": "3",
+            #         "instrument": "TRY_JPY",
+            #         "price": "3.333",
+            #         "currentUnits": "18",
+            #     },
+            # ],
         }
         actual_value = position_protect.get_top_losing_positions_by_pair(top_n=10)
         assert expected_value == actual_value
@@ -236,14 +236,14 @@ class TestPositionProtect:
                     "currentUnits": "-18",
                 },
             ],
-            "TRY_JPY": [
-                {
-                    "id": "4000",
-                    "instrument": "TRY_JPY",
-                    "price": "4.000",
-                    "currentUnits": "18",
-                },
-            ],
+            # "TRY_JPY": [
+            #     {
+            #         "id": "4000",
+            #         "instrument": "TRY_JPY",
+            #         "price": "4.000",
+            #         "currentUnits": "18",
+            #     },
+            # ],
         }
         actual_value = position_protect.get_top_losing_positions_by_pair(top_n=1)
         assert expected_value == actual_value
@@ -320,20 +320,20 @@ class TestPositionProtect:
                     "currentUnits": "-18",
                 },
             ],
-            "TRY_JPY": [
-                {
-                    "id": "3",
-                    "instrument": "TRY_JPY",
-                    "price": "3.333",
-                    "currentUnits": "18",
-                },
-                {
-                    "id": "4000",
-                    "instrument": "TRY_JPY",
-                    "price": "4.000",
-                    "currentUnits": "18",
-                },
-            ],
+            # "TRY_JPY": [
+            #     {
+            #         "id": "3",
+            #         "instrument": "TRY_JPY",
+            #         "price": "3.333",
+            #         "currentUnits": "18",
+            #     },
+            #     {
+            #         "id": "4000",
+            #         "instrument": "TRY_JPY",
+            #         "price": "4.000",
+            #         "currentUnits": "18",
+            #     },
+            # ],
         }
         actual_value = (
             position_protect._filter_each_currency_position_by_open_trades_list(args)
@@ -562,14 +562,14 @@ class TestPositionProtect:
                     "currentUnits": "test",
                 }
             ],
-            "TRY_JPY": [
-                {
-                    "id": "789",
-                    "instrument": "TRY_JPY",
-                    "price": "test",
-                    "currentUnits": "test",
-                }
-            ],
+            # "TRY_JPY": [
+            #     {
+            #         "id": "789",
+            #         "instrument": "TRY_JPY",
+            #         "price": "test",
+            #         "currentUnits": "test",
+            #     }
+            # ],
         }
 
         position_protect.trim_position()
@@ -577,7 +577,7 @@ class TestPositionProtect:
             [
                 call(trade_id="123", close_data={"units": "ALL"}),
                 call(trade_id="456", close_data={"units": "ALL"}),
-                call(trade_id="789", close_data={"units": "ALL"}),
+                # call(trade_id="789", close_data={"units": "ALL"}),
             ]
         )
 
@@ -605,14 +605,14 @@ class TestPositionProtect:
                     "currentUnits": "test",
                 }
             ],
-            "TRY_JPY": [
-                {
-                    "id": "7890",
-                    "instrument": "TRY_JPY",
-                    "price": "test",
-                    "currentUnits": "test",
-                }
-            ],
+            # "TRY_JPY": [
+            #     {
+            #         "id": "7890",
+            #         "instrument": "TRY_JPY",
+            #         "price": "test",
+            #         "currentUnits": "test",
+            #     }
+            # ],
         }
 
         position_protect.trim_position(args)
@@ -620,7 +620,7 @@ class TestPositionProtect:
             [
                 call(trade_id="1230", close_data={"units": "ALL"}),
                 call(trade_id="4560", close_data={"units": "ALL"}),
-                call(trade_id="7890", close_data={"units": "ALL"}),
+                # call(trade_id="7890", close_data={"units": "ALL"}),
             ]
         )
 
@@ -647,14 +647,14 @@ class TestPositionProtect:
                 }
             ],
             "USD_MXN": [],
-            "TRY_JPY": [
-                {
-                    "id": "7890",
-                    "instrument": "TRY_JPY",
-                    "price": "test",
-                    "currentUnits": "test",
-                }
-            ],
+            # "TRY_JPY": [
+            #     {
+            #         "id": "7890",
+            #         "instrument": "TRY_JPY",
+            #         "price": "test",
+            #         "currentUnits": "test",
+            #     }
+            # ],
         }
         expected_response = {}
 

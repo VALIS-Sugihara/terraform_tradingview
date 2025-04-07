@@ -33,9 +33,13 @@ def investment():
     oanda = OANDA(account_mode="test")
     investment = Investment(oanda, 3)
     # OANDA の規定レバレッジを設定
-    investment.platform.leverages = {"USD_JPY": 0.022, "USD_MXN": 0.05, "TRY_JPY": 0.25}
-    # OANDA の規定レバレッジを設定
-    investment.platform.leverages = {"USD_JPY": 0.022, "USD_MXN": 0.05, "TRY_JPY": 0.25}
+    investment.platform.leverages = {
+        "USD_JPY": 0.022,
+        "USD_MXN": 0.05,
+        "TRY_JPY": 0.25,
+        "GBP_JPY": 0.04,
+        "GBP_CHF": 0.04,
+    }
     # investment.platform.account.get_margin_available = MagicMock()
     # investment.platform.account.get_margin_available.return_value = 1230195
     # investment.platform.account.get_margin_used = MagicMock()
@@ -65,6 +69,17 @@ class TestInvestment:
         expected_usd_amount = 4500
         actual_usd_amount = investment.calcurate_usdjpy_amount(jpy_amount, price_map)
         assert expected_usd_amount == actual_usd_amount
+
+    def test_calcurate_gbpjpy_amount_return_collect_value(self, investment):
+        # GBP_JPY: 200円 であれば、GBP を 10000枚買うには 22,000円必要
+        instrument = "GBP_JPY"
+        amount = 10000
+        price_map = {"GBP_JPY": OANDA.Price.Prices(90, 200, 95)}  # bid,ask,mid
+        expected_required_margin = 80000  # 200*10000*0.04
+        actual_required_margin = investment.calculate_required_margin(
+            instrument=instrument, amount=amount, price_map=price_map
+        )
+        assert expected_required_margin == actual_required_margin
 
     def test_calcurate_tryjpy_amount_return_correct_value(self, investment):
         # 正しい値が返っていることをテストする
@@ -275,6 +290,8 @@ class TestCompoundInvestment:
         compound_investment.verify_purchase_requirements.return_value = True
         compound_investment.calcurate_usdjpy_amount = MagicMock()
         compound_investment.calcurate_usdjpy_amount.return_value = 100
+        compound_investment.calcurate_gbpjpy_amount = MagicMock()
+        compound_investment.calcurate_gbpjpy_amount.return_value = 200
         compound_investment.calcurate_tryjpy_amount = MagicMock()
         compound_investment.calcurate_tryjpy_amount.return_value = 300
         compound_investment.platform.trade.request_place_order = MagicMock()
@@ -311,6 +328,28 @@ class TestCompoundInvestment:
                         "order": {
                             "units": "300",
                             "instrument": "TRY_JPY",
+                            "timeInForce": "FOK",
+                            "type": "MARKET",
+                            "positionFill": "DEFAULT",
+                        }
+                    }
+                ),
+                call(
+                    {
+                        "order": {
+                            "units": "200",
+                            "instrument": "GBP_JPY",
+                            "timeInForce": "FOK",
+                            "type": "MARKET",
+                            "positionFill": "DEFAULT",
+                        }
+                    }
+                ),
+                call(
+                    {
+                        "order": {
+                            "units": "200",
+                            "instrument": "GBP_CHF",
                             "timeInForce": "FOK",
                             "type": "MARKET",
                             "positionFill": "DEFAULT",
