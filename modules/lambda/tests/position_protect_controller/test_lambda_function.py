@@ -10,6 +10,7 @@ path_ = os.path.abspath(
 )
 sys.path.insert(0, path_)
 
+os.environ["LEVERAGE"] = "3"
 os.environ["SECRET_NAME"] = "test"
 os.environ["ACCOUNT_MODE"] = "test"
 _credentials = {
@@ -404,3 +405,38 @@ def test_execute_merge_tickets_called_correct_args_request_place_order(
         position_protect.platform.trade.request_place_order.call_args_list
         == expected_call_list
     )
+
+
+@patch("position_protect_controller.resources.lambda_function.OANDA")
+@patch(
+    "position_protect_controller.resources.lambda_function.PositionProtect.is_under_threshold"
+)
+@patch(
+    "position_protect_controller.resources.lambda_function.PositionProtect.trim_position"
+)
+def test_execute_position_protect_stop_after_max_tries(
+    mock_trim_position, mock_is_under_threshold, mock_oanda
+):
+    # 最大試行回数を上回ったら stop することをテストする
+    mock_trim_position.return_value = {}
+    mock_is_under_threshold.side_effect = [
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+    ]
+
+    execute_position_protect()
+
+    assert mock_is_under_threshold.call_count == 11

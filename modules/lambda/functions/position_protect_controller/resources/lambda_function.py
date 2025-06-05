@@ -1275,8 +1275,10 @@ def execute_position_protect():
         oanda = OANDA(account_mode=ACCOUNT_MODE)
         position_protect = PositionProtect(oanda, PROTECTION_THRESHOLD)
 
+        MAX_TRIES = 10  # 5分おきなので一旦 10回まで試行する
+        tries = 0
         each_currency_position = {}
-        while position_protect.is_under_threshold() is True:
+        while position_protect.is_under_threshold() is True and tries < MAX_TRIES:
             logger.info(
                 f"口座維持率が {PROTECTION_THRESHOLD}% を下回りました。ポジション調整を行います..."
             )
@@ -1287,6 +1289,7 @@ def execute_position_protect():
             logger.info(
                 f"現在の口座維持率は {(position_protect.platform.account.get_net_asset_value()/position_protect.platform.account.get_margin_used())*100}% です"
             )
+            tries += 1
 
         # チケット数が 800枚を上回ったらマージする
         total_tickets_amount = position_protect.get_total_tickets_amount()
