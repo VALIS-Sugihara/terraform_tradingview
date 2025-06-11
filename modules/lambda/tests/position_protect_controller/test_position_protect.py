@@ -122,6 +122,30 @@ class TestPositionProtect:
                     "price": "4.000",
                     "currentUnits": "18",
                 },
+                {
+                    "id": "4",
+                    "instrument": "GBP_JPY",
+                    "price": "200.333",
+                    "currentUnits": "18",
+                },
+                {
+                    "id": "5000",
+                    "instrument": "GBP_JPY",
+                    "price": "195.000",
+                    "currentUnits": "18",
+                },
+                {
+                    "id": "5",
+                    "instrument": "GBP_CHF",
+                    "price": "1.111",
+                    "currentUnits": "18",
+                },
+                {
+                    "id": "6000",
+                    "instrument": "GBP_CHF",
+                    "price": "1.222",
+                    "currentUnits": "18",
+                },
             ]
         }
         expected_value = {
@@ -167,6 +191,34 @@ class TestPositionProtect:
             #         "currentUnits": "18",
             #     },
             # ],
+            "GBP_JPY": [
+                {
+                    "id": "4",
+                    "instrument": "GBP_JPY",
+                    "price": "200.333",
+                    "currentUnits": "18",
+                },
+                {
+                    "id": "5000",
+                    "instrument": "GBP_JPY",
+                    "price": "195.000",
+                    "currentUnits": "18",
+                },
+            ],
+            "GBP_CHF": [
+                {
+                    "id": "6000",
+                    "instrument": "GBP_CHF",
+                    "price": "1.222",
+                    "currentUnits": "18",
+                },
+                {
+                    "id": "5",
+                    "instrument": "GBP_CHF",
+                    "price": "1.111",
+                    "currentUnits": "18",
+                },
+            ],
         }
         actual_value = position_protect.get_top_losing_positions_by_pair(top_n=10)
         assert expected_value == actual_value
@@ -217,6 +269,30 @@ class TestPositionProtect:
                     "price": "4.000",
                     "currentUnits": "18",
                 },
+                {
+                    "id": "4",
+                    "instrument": "GBP_JPY",
+                    "price": "200.333",
+                    "currentUnits": "18",
+                },
+                {
+                    "id": "5000",
+                    "instrument": "GBP_JPY",
+                    "price": "195.000",
+                    "currentUnits": "18",
+                },
+                {
+                    "id": "5",
+                    "instrument": "GBP_CHF",
+                    "price": "1.111",
+                    "currentUnits": "18",
+                },
+                {
+                    "id": "6000",
+                    "instrument": "GBP_CHF",
+                    "price": "1.222",
+                    "currentUnits": "18",
+                },
             ]
         }
         expected_value = {
@@ -244,6 +320,22 @@ class TestPositionProtect:
             #         "currentUnits": "18",
             #     },
             # ],
+            "GBP_JPY": [
+                {
+                    "id": "4",
+                    "instrument": "GBP_JPY",
+                    "price": "200.333",
+                    "currentUnits": "18",
+                },
+            ],
+            "GBP_CHF": [
+                {
+                    "id": "6000",
+                    "instrument": "GBP_CHF",
+                    "price": "1.222",
+                    "currentUnits": "18",
+                },
+            ],
         }
         actual_value = position_protect.get_top_losing_positions_by_pair(top_n=1)
         assert expected_value == actual_value
@@ -290,6 +382,30 @@ class TestPositionProtect:
                 "price": "4.000",
                 "currentUnits": "18",
             },
+            {
+                "id": "4",
+                "instrument": "GBP_JPY",
+                "price": "200.333",
+                "currentUnits": "18",
+            },
+            {
+                "id": "5000",
+                "instrument": "GBP_JPY",
+                "price": "195.000",
+                "currentUnits": "18",
+            },
+            {
+                "id": "5",
+                "instrument": "GBP_CHF",
+                "price": "1.111",
+                "currentUnits": "18",
+            },
+            {
+                "id": "6000",
+                "instrument": "GBP_CHF",
+                "price": "1.222",
+                "currentUnits": "18",
+            },
         ]
         expected_value = {
             "USD_JPY": [
@@ -334,6 +450,34 @@ class TestPositionProtect:
             #         "currentUnits": "18",
             #     },
             # ],
+            "GBP_CHF": [
+                {
+                    "id": "5",
+                    "instrument": "GBP_CHF",
+                    "price": "1.111",
+                    "currentUnits": "18",
+                },
+                {
+                    "id": "6000",
+                    "instrument": "GBP_CHF",
+                    "price": "1.222",
+                    "currentUnits": "18",
+                },
+            ],
+            "GBP_JPY": [
+                {
+                    "id": "4",
+                    "instrument": "GBP_JPY",
+                    "price": "200.333",
+                    "currentUnits": "18",
+                },
+                {
+                    "id": "5000",
+                    "instrument": "GBP_JPY",
+                    "price": "195.000",
+                    "currentUnits": "18",
+                },
+            ],
         }
         actual_value = (
             position_protect._filter_each_currency_position_by_open_trades_list(args)
@@ -570,6 +714,22 @@ class TestPositionProtect:
             #         "currentUnits": "test",
             #     }
             # ],
+            "GBP_JPY": [
+                {
+                    "id": "910",
+                    "instrument": "GBP_JPY",
+                    "price": "test",
+                    "currentUnits": "test",
+                }
+            ],
+            "GBP_CHF": [
+                {
+                    "id": "1112",
+                    "instrument": "GBP_CHF",
+                    "price": "test",
+                    "currentUnits": "test",
+                }
+            ],
         }
 
         position_protect.trim_position()
@@ -578,6 +738,8 @@ class TestPositionProtect:
                 call(trade_id="123", close_data={"units": "ALL"}),
                 call(trade_id="456", close_data={"units": "ALL"}),
                 # call(trade_id="789", close_data={"units": "ALL"}),
+                call(trade_id="910", close_data={"units": "ALL"}),
+                call(trade_id="1112", close_data={"units": "ALL"}),
             ]
         )
 
@@ -613,6 +775,22 @@ class TestPositionProtect:
             #         "currentUnits": "test",
             #     }
             # ],
+            "GBP_JPY": [
+                {
+                    "id": "9100",
+                    "instrument": "GBP_JPY",
+                    "price": "test",
+                    "currentUnits": "test",
+                }
+            ],
+            "GBP_CHF": [
+                {
+                    "id": "11120",
+                    "instrument": "GBP_CHF",
+                    "price": "test",
+                    "currentUnits": "test",
+                }
+            ],
         }
 
         position_protect.trim_position(args)
@@ -621,6 +799,8 @@ class TestPositionProtect:
                 call(trade_id="1230", close_data={"units": "ALL"}),
                 call(trade_id="4560", close_data={"units": "ALL"}),
                 # call(trade_id="7890", close_data={"units": "ALL"}),
+                call(trade_id="9100", close_data={"units": "ALL"}),
+                call(trade_id="11120", close_data={"units": "ALL"}),
             ]
         )
 

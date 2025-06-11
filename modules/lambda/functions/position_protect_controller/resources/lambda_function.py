@@ -531,8 +531,8 @@ class OANDA:
         main_currency_pairs = (
             "USD_JPY",
             "USD_MXN",
-            # "GBP_JPY",
-            # "GBP_CHF",
+            "GBP_JPY",
+            "GBP_CHF",
         )
 
         def __init__(self, oanda):
@@ -1299,8 +1299,8 @@ def execute_position_protect():
 
 
 def execute_merge_tickets(position_protect: PositionProtect):
-    # 3枚ずつ行うものとする
-    each_currency_position = position_protect.get_top_losing_positions_by_pair(top_n=3)
+    # 5枚ずつ行うものとする
+    each_currency_position = position_protect.get_top_losing_positions_by_pair(top_n=5)
     for instrument, order_list in each_currency_position.items():
         close_units: int = 0
         for order in order_list:
