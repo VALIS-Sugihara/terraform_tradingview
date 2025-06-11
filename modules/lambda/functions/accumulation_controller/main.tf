@@ -50,7 +50,7 @@ resource "aws_cloudwatch_log_subscription_filter" "log_filter_error" {
 resource "aws_cloudwatch_event_rule" "lambda_schedule" {
   name                = var.event_bridge_rule_name
   description         = "Triggers Lambda MON-FRI day at 12:00 PM JST"
-  schedule_expression = "cron(0 3 ? * MON-FRI *)" # 平日 12時
+  schedule_expression = "cron(0 3,6,12,16 ? * MON-FRI *)" # 平日 12,15,21,25時
 }
 
 # CloudWatch Event Target to attach the Lambda to the rule

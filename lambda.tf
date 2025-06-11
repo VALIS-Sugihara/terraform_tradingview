@@ -63,7 +63,7 @@ module "lambda_demo_accumulation_controller" {
   environment_variables = {
     SECRET_NAME    = local.DEMO_OANDA_SECRET_NAME
     ACCOUNT_MODE   = local.ACCOUNT_MODE_DEMO # デモ環境
-    MONTHLY_AMOUNT = 800000
+    MONTHLY_AMOUNT = 400000
     LEVERAGE       = 7.7
   }
   log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn
@@ -84,7 +84,7 @@ module "lambda_pers_accumulation_controller" {
   environment_variables = {
     SECRET_NAME    = local.PERS_OANDA_SECRET_NAME
     ACCOUNT_MODE   = local.ACCOUNT_MODE_PERS # 個人環境
-    MONTHLY_AMOUNT = 80000
+    MONTHLY_AMOUNT = 20000
     LEVERAGE       = 3.0
   }
   log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn
@@ -105,7 +105,7 @@ module "lambda_corp_accumulation_controller" {
   environment_variables = {
     SECRET_NAME    = local.CORP_OANDA_SECRET_NAME
     ACCOUNT_MODE   = local.ACCOUNT_MODE_CORP # 法人環境
-    MONTHLY_AMOUNT = 800000
+    MONTHLY_AMOUNT = 400000
     LEVERAGE       = 3.0
   }
   log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn
