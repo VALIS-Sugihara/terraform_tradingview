@@ -1050,15 +1050,18 @@ class Investment:
         # 必要証拠金が購入金額以下の場合は False
         if margin_available < required_margin:
             flag = False
+            logger.info("必要証拠金が購入金額以下のため購入しません。")
             return flag
 
         # 有効残高 / 維持証拠金 が 110% 以下の場合は False
         margin_used = self.platform.account.get_margin_used()
         nav = self.platform.account.get_net_asset_value()
+        PURCHASE_THRESHOLD = 110
         if (
-            margin_used != 0 and (nav / margin_used) * 100 < 110
+            margin_used != 0 and (nav / margin_used) * 100 < PURCHASE_THRESHOLD
         ):  # 初期状態では維持証拠金 0円のため回避
             flag = False
+            logger.info(f"必要証拠金が {PURCHASE_THRESHOLD}% 以下のため購入しません。")
             return flag
 
         return flag
