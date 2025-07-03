@@ -105,7 +105,7 @@ module "lambda_corp_accumulation_controller" {
   environment_variables = {
     SECRET_NAME    = local.CORP_OANDA_SECRET_NAME
     ACCOUNT_MODE   = local.ACCOUNT_MODE_CORP # 法人環境
-    MONTHLY_AMOUNT = 400000
+    MONTHLY_AMOUNT = 100000
     LEVERAGE       = 3.0
   }
   log_processor_lambda_arn  = aws_lambda_function.log_processor_lambda.arn
